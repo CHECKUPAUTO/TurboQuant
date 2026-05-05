@@ -1,0 +1,27 @@
+[Unit]
+Description=TurboQuant Agent — Audit modèles LLM & projection compression KV cache
+Documentation=https://github.com/CHECKUPAUTO/TurboQuant
+After=network-online.target ollama.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/opt/turboquant/bin/turboquant-daemon agent --interval 300
+Restart=always
+RestartSec=30
+Environment=OLLAMA_HOST=http://127.0.0.1:11434
+Environment=TQ_REPORT_DIR=/var/log/turboquant
+Environment=TQ_SCAN_PATHS=/opt/models:/data/models:/mnt
+ProtectSystem=strict
+ReadWritePaths=/var/log/turboquant
+ProtectHome=read-only
+NoNewPrivileges=true
+PrivateTmp=true
+MemoryMax=256M
+CPUQuota=25%
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=turboquant-agent
+
+[Install]
+WantedBy=multi-user.target

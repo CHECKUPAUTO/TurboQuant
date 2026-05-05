@@ -1,0 +1,23 @@
+[Unit]
+Description=TurboQuant Watch — Real-time Ollama model monitoring
+Documentation=https://github.com/CHECKUPAUTO/TurboQuant
+After=network-online.target ollama.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+Environment="OLLAMA_HOST=http://127.0.0.1:11434"
+Environment="TQ_REPORT_DIR=/var/log/turboquant"
+Environment="RUST_LOG=info"
+ExecStartPre=/bin/mkdir -p /var/log/turboquant
+ExecStart=/opt/turboquant/bin/turboquant-daemon watch
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=turboquant-watch
+
+[Install]
+WantedBy=multi-user.target
