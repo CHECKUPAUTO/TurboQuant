@@ -53,7 +53,7 @@ import torch.nn as nn
 class MLATurboQuantSynergy(nn.Module):
     """
     Fused MLA + TurboQuant layer with pre-computed rotation absorption.
-    
+
     Architecture:
     1. Project hidden state to latent vector c_t
     2. Apply rotation R (PolarQuant)
@@ -61,30 +61,30 @@ class MLATurboQuantSynergy(nn.Module):
     4. Store in KV cache
     5. On retrieval: compute key with absorbed matrix W_hat
     """
-    
+
     def __init__(self, latent_dim: int, head_dim: int, num_heads: int = 8):
         super().__init__()
         self.latent_dim = latent_dim
         self.head_dim = head_dim
         self.num_heads = num_heads
-        
+
         # Original MLA weights
         self.W_k = nn.Linear(latent_dim, head_dim * num_heads, bias=False)
         self.W_v = nn.Linear(latent_dim, head_dim * num_heads, bias=False)
         self.W_q = nn.Linear(latent_dim, head_dim * num_heads, bias=False)
-        
+
         # Generate random orthogonal rotation matrix R
         H = torch.randn(latent_dim, latent_dim)
         Q, _ = torch.linalg.qr(H)  # QR decomposition → orthogonal Q
         self.register_buffer('R', Q)
         self.register_buffer('R_T', Q.T)
-        
+
         # Pre-compute absorbed matrices
         self._absorb_rotations()
-        
+
         # QJL correction scale (learnable)
         self.qjl_scale = nn.Parameter(torch.ones(1) * 0.01)
-    
+
     def _absorb_rotations(self):
         """
         Pre-compute W_hat = W · R^T for all projection matrices.
@@ -94,52 +94,52 @@ class MLATurboQuantSynergy(nn.Module):
             # Absorb inverse rotation into projection weights
             W_k_absorbed = torch.matmul(self.W_k.weight, self.R_T)
             W_v_absorbed = torch.matmul(self.W_v.weight, self.R_T)
-            
+
             # Store absorbed weights
             self.register_buffer('W_k_hat', W_k_absorbed)
             self.register_buffer('W_v_hat', W_v_absorbed)
-    
+
     def quantize_3bit(self, x: torch.Tensor) -> torch.Tensor:
         """
         3-bit quantization with QJL correction.
-        
+
         TurboQuant uses 3 bits per value (8 levels).
         Range: [-3.5, 3.5] in 0.5 increments
         """
         # Scale to [-3.5, 3.5]
         x_scaled = x / (x.abs().max() + 1e-8) * 3.5
-        
+
         # Quantize to 3 bits (8 levels)
         x_quant = torch.round(x_scaled * 2) / 2  # 0.5 increments
-        
+
         # QJL 1-bit correction
         residual = x_scaled - x_quant
         correction = torch.sign(residual) * self.qjl_scale
-        
+
         return x_quant + correction
-    
+
     def forward_latent(self, h: torch.Tensor) -> torch.Tensor:
         """
         Project hidden state to latent vector.
         This is the MLA compression step.
         """
         return h  # Already in latent space in MLA
-    
+
     def store_in_kv_cache(self, c_t: torch.Tensor) -> torch.Tensor:
         """
         Apply PolarQuant rotation + 3-bit quantization.
-        
+
         Input: c_t (latent vector from MLA)
         Output: y_t (compressed, ready for KV cache)
         """
         # Apply rotation (PolarQuant)
         y_t = torch.matmul(c_t, self.R_T)
-        
+
         # Quantize to 3-bit with QJL correction
         y_t_compressed = self.quantize_3bit(y_t)
-        
+
         return y_t_compressed
-    
+
     def compute_key(self, y_t: torch.Tensor) -> torch.Tensor:
         """
         Generate attention key from compressed cache.
@@ -147,24 +147,24 @@ class MLATurboQuantSynergy(nn.Module):
         """
         # Fused projection: no rotation needed, already absorbed
         return torch.matmul(y_t, self.W_k_hat.T)
-    
+
     def compute_value(self, y_t: torch.Tensor) -> torch.Tensor:
         """
         Generate attention value from compressed cache.
         """
         return torch.matmul(y_t, self.W_v_hat.T)
-    
+
     def forward(self, h: torch.Tensor, use_cache: bool = True):
         """
         Full forward pass with MLA + TurboQuant compression.
         """
         # Project to latent (MLA)
         c_t = self.forward_latent(h)
-        
+
         if use_cache:
             # Compress for KV cache
             y_t = self.store_in_kv_cache(c_t)
-            
+
             # Compute K, V with absorbed rotations
             k = self.compute_key(y_t)
             v = self.compute_value(y_t)
@@ -172,67 +172,98 @@ class MLATurboQuantSynergy(nn.Module):
             # Standard path (no compression)
             k = self.W_k(c_t)
             v = self.W_v(c_t)
-        
+
         # Query projection (standard)
         q = self.W_q(c_t)
-        
+
         return q, k, v
 
 
 class TurboQuantKVCache:
     """
     KV Cache manager with 3-bit compression.
-    
+
     Memory savings:
     - FP16: 16 bits per value
     - TurboQuant: 3 bits per value
     - Reduction: ~5.3x
     """
-    
+
     def __init__(self, max_seq_len: int, latent_dim: int, num_layers: int):
         self.max_seq_len = max_seq_len
         self.latent_dim = latent_dim
         self.num_layers = num_layers
-        
+
         # Each value stored as 3 bits
         # Pack 2 values per byte (3+3=6 bits, 2 bits padding)
         self.cache_k = {}  # layer -> compressed tensor
         self.cache_v = {}
-    
+
     def store(self, layer: int, pos: int, k_compressed: torch.Tensor, v_compressed: torch.Tensor):
         """Store compressed KV tensors."""
         if layer not in self.cache_k:
-            self.cache_k[layer] = torch.zeros(self.max_seq_len, self.latent_dim, dtype=torch.uint8)
-            self.cache_v[layer] = torch.zeros(self.max_seq_len, self.latent_dim, dtype=torch.uint8)
-        
+            self.cache_k[layer] = torch.zeros(
+                self.max_seq_len, (self.latent_dim * 3 + 7) // 8,
+                dtype=torch.uint8
+            )
+            self.cache_v[layer] = torch.zeros(
+                self.max_seq_len, (self.latent_dim * 3 + 7) // 8,
+                dtype=torch.uint8
+            )
+
         # Pack 3-bit values into uint8
-        # Implementation depends on specific packing scheme
         self.cache_k[layer][pos] = self._pack_3bit(k_compressed)
         self.cache_v[layer][pos] = self._pack_3bit(v_compressed)
-    
+
     def retrieve(self, layer: int, pos: int) -> tuple:
         """Retrieve and decompress KV tensors."""
         k_packed = self.cache_k[layer][pos]
         v_packed = self.cache_v[layer][pos]
-        
+
         return self._unpack_3bit(k_packed), self._unpack_3bit(v_packed)
-    
+
     def _pack_3bit(self, x: torch.Tensor) -> torch.Tensor:
-        """Pack 3-bit quantized values into uint8."""
-        # 2 values per byte: (v1 << 3) | v2
-        # Implementation specific
-        pass
-    
+        """
+        Pack 3-bit quantized values into uint8.
+
+        Strategy: pack 2 values per byte (3 bits each, 2 bits padding).
+        Values are expected in range [0, 7] (3-bit unsigned).
+        """
+        # Flatten and clamp to valid 3-bit range
+        flat = x.flatten().long().clamp(0, 7)
+
+        # Pad to even length
+        if flat.numel() % 2 != 0:
+            flat = torch.cat([flat, flat.new_zeros(1)])
+
+        # Pack pairs: (v1 << 3) | v2
+        even = flat[0::2]
+        odd = flat[1::2]
+        packed = (even << 3) | odd
+
+        return packed.to(torch.uint8)
+
     def _unpack_3bit(self, x: torch.Tensor) -> torch.Tensor:
-        """Unpack uint8 to 3-bit values."""
-        pass
-    
+        """
+        Unpack uint8 to 3-bit values.
+
+        Reverses _pack_3bit: extracts 2 values per byte.
+        """
+        # Unpack pairs
+        high = (x >> 3) & 0x7  # upper 3 bits
+        low = x & 0x7           # lower 3 bits
+
+        # Interleave: [high0, low0, high1, low1, ...]
+        result = torch.stack([high, low], dim=-1).flatten()
+
+        return result.float()
+
     def memory_usage_mb(self) -> float:
         """Calculate actual memory usage in MB."""
-        bytes_per_layer = self.max_seq_len * self.latent_dim
+        bytes_per_layer = self.max_seq_len * (self.latent_dim * 3 + 7) // 8
         total_bytes = bytes_per_layer * 2 * self.num_layers  # K + V
         return total_bytes / (1024 * 1024)
-    
+
     def compression_ratio(self) -> float:
         """Compare to FP16 baseline."""
         fp16_bytes = self.max_seq_len * self.latent_dim * 2  # 2 bytes per FP16

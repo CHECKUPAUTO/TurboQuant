@@ -2,6 +2,10 @@
 
 **3-bit KV Cache Compression for Large Language Models**
 
+[![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://python.org)
+[![PyTorch](https://img.shields.io/badge/pytorch-2.0+-ee4c2c.svg)](https://pytorch.org)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 A data-oblivious compression algorithm that reduces KV cache memory footprint by ~6x while maintaining near-zero quality loss (<0.1%).
 
 ## Overview
@@ -46,7 +50,49 @@ Correction = Sign(Residual) · Scale_factor
 
 This ensures the dot product between Query and Key vectors remains mathematically exact.
 
+## Installation
+
+```bash
+pip install -e .
+# or
+pip install torch  # minimal dependency
+```
+
 ## Usage
+
+### Python API
+
+```python
+from turboquant import TurboQuantKVCache, benchmark_turboquant
+
+# Create compressed KV cache
+cache = TurboQuantKVCache(
+    num_layers=24,
+    max_seq_len=4096,
+    head_dim=128,
+    num_heads=32,
+    bits=3
+)
+
+# Compress during forward pass
+k_compressed, k_scale = cache.compress(k_tensor, layer_idx=0)
+v_compressed, v_scale = cache.compress(v_tensor, layer_idx=0)
+
+# Decompress on retrieval
+k_decompressed = cache.decompress(k_compressed, k_scale, layer_idx=0)
+
+print(f"Memory: {cache.memory_usage_mb():.2f} MB")
+print(f"Compression: {cache.compression_ratio_vs_fp16():.1f}x")
+```
+
+### Benchmark
+
+```python
+results = benchmark_turboquant(seq_len=4096)
+print(f"FP16: {results['fp16_memory_mb']:.2f} MB")
+print(f"TurboQuant: {results['turboquant_memory_mb']:.2f} MB")
+print(f"Ratio: {results['compression_ratio']:.1f}x")
+```
 
 ### llama.cpp Deployment
 
@@ -119,9 +165,24 @@ Compressed KV Cache (3-bit)
 
 ## Requirements
 
-- Model in GGUF format (Q4_K_M recommended for best balance)
-- llama.cpp with TurboQuant support OR Ollama (future version)
+- Python 3.10+
+- PyTorch 2.0+
+- For GPU: CUDA-capable device + `torch.cuda`
 - Sufficient RAM for model weights (KV cache is compressed)
+
+## Project Structure
+
+```
+TurboQuant/
+├── turboquant.py         # Core implementation
+├── README.md             # This file
+├── LICENSE               # MIT License
+├── requirements.txt      # Dependencies
+├── pyproject.toml        # Package configuration
+├── docs/
+│   └── performance.md    # Benchmarks
+└── MLA_TurboQuant_Synergy.md  # MLA integration
+```
 
 ## Research Paper
 
@@ -129,8 +190,8 @@ Based on Google Research publication (March 2026). See `/docs` for technical det
 
 ## License
 
-MIT License
+MIT License - see [LICENSE](LICENSE) file.
 
 ## Author
 
-CHECKUPAUTO - Tarek
+CHECKUPAUTO — [GitHub](https://github.com/CHECKUPAUTO/TurboQuant)
