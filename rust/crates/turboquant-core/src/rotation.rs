@@ -38,9 +38,9 @@ impl QrRotation {
     /// # Examples
     ///
     /// ```
-    /// use turboquant_core::rotation::QrRotation;
+    /// use turboquant_core::rotation::{QrRotation, Rotation};
     ///
-    /// let rot = QrRotation::new(64);
+    /// let rot = QrRotation::new(64, Some(42));
     /// assert_eq!(rot.dim(), 64);
     /// ```
     #[allow(clippy::cast_possible_truncation)]
@@ -109,7 +109,7 @@ impl Rotation for QrRotation {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct HouseholderRotation {
     /// Dimension of the rotation.
-    dim: usize,
+    dimension: usize,
     /// Householder reflector vectors.
     reflectors: Vec<Array1<f32>>,
 }
@@ -120,7 +120,7 @@ impl HouseholderRotation {
     /// # Examples
     ///
     /// ```
-    /// use turboquant_core::rotation::HouseholderRotation;
+    /// use turboquant_core::rotation::{HouseholderRotation, Rotation};
     ///
     /// let rot = HouseholderRotation::new(128, 16, Some(42));
     /// assert_eq!(rot.dim(), 128);
@@ -142,7 +142,7 @@ impl HouseholderRotation {
             "Created HouseholderRotation(dim={}, k={})",
             dim, num_reflectors
         );
-        Self { dim, reflectors }
+        Self { dimension: dim, reflectors }
     }
 
     /// Apply a Householder reflector: `v -> v - 2·(v·u)/(u·u)·u`.
@@ -162,6 +162,14 @@ impl HouseholderRotation {
     }
 }
 
+impl HouseholderRotation {
+    /// Return the dimension of the rotation.
+    #[must_use]
+    pub fn dim(&self) -> usize {
+        self.dimension
+    }
+}
+
 impl Rotation for HouseholderRotation {
     fn forward(&self, x: &mut ArrayViewMut2<f32>) {
         for u in &self.reflectors {
@@ -177,7 +185,7 @@ impl Rotation for HouseholderRotation {
     }
 
     fn dim(&self) -> usize {
-        self.dim
+        self.dimension
     }
 }
 
@@ -187,7 +195,7 @@ impl Rotation for HouseholderRotation {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FastHadamardRotation {
     /// Dimension (must be a power of two).
-    dim: usize,
+    dimension: usize,
     /// Random sign flips.
     signs: Vec<i8>,
 }
@@ -215,7 +223,7 @@ impl FastHadamardRotation {
             .collect();
 
         debug!("Created FastHadamardRotation(dim={})", dim);
-        Self { dim, signs }
+        Self { dimension: dim, signs }
     }
 
     /// In-place Fast Hadamard Transform (Walsh-Hadamard).
@@ -237,12 +245,20 @@ impl FastHadamardRotation {
     }
 }
 
+impl FastHadamardRotation {
+    /// Return the dimension of the rotation.
+    #[must_use]
+    pub fn dim(&self) -> usize {
+        self.dimension
+    }
+}
+
 impl Rotation for FastHadamardRotation {
     #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
     fn forward(&self, x: &mut ArrayViewMut2<f32>) {
         let ncols = x.ncols();
         let nrows = x.nrows();
-        let scale = 1.0 / (self.dim as f32).sqrt();
+        let scale = 1.0 / (self.dimension as f32).sqrt();
 
         for i in 0..nrows {
             let mut row: Vec<f32> = (0..ncols).map(|j| x[[i, j]]).collect();
@@ -264,27 +280,25 @@ impl Rotation for FastHadamardRotation {
     }
 
     fn inverse(&self, y: &mut ArrayViewMut2<f32>) {
-        // Hadamard is self-inverse (up to scale). Apply same transform
-        // then apply signs again.
+        // Inverse: scale * FHT(y) * signs
+        // Proof: inverse(forward(x)) = signs * scale * FHT(scale * FHT(signs * x))
+        //        = signs * scale^2 * FHT(FHT(signs * x))
+        //        = signs * (1/n) * n * signs * x = signs^2 * x = x
         let ncols = y.ncols();
         let nrows = y.nrows();
-        let scale = 1.0 / (self.dim as f32).sqrt();
+        let scale = 1.0 / (self.dimension as f32).sqrt();
 
         for i in 0..nrows {
             let mut row: Vec<f32> = (0..ncols).map(|j| y[[i, j]]).collect();
-            // Unscale
-            for val in &mut row {
-                *val /= scale;
-            }
-            // FHT (self-inverse up to scale)
-            Self::fht_1d(&mut row);
-            // Apply signs again
-            for (j, val) in row.iter_mut().enumerate() {
-                *val *= f32::from(self.signs[j]);
-            }
-            // Scale back
+            // Apply scale
             for val in &mut row {
                 *val *= scale;
+            }
+            // FHT
+            Self::fht_1d(&mut row);
+            // Apply signs
+            for (j, val) in row.iter_mut().enumerate() {
+                *val *= f32::from(self.signs[j]);
             }
             for (j, val) in row.iter().enumerate() {
                 y[[i, j]] = *val;
@@ -293,7 +307,7 @@ impl Rotation for FastHadamardRotation {
     }
 
     fn dim(&self) -> usize {
-        self.dim
+        self.dimension
     }
 }
 

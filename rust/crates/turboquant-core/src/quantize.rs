@@ -200,7 +200,7 @@ pub fn turbo_attention_forward(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::qjl::{CorrectionMode, ScaleMode};
+    use crate::qjl::{CorrectionMode, QjlConfig, ScaleMode};
     use crate::rotation::QrRotation;
     use ndarray::Array2;
 

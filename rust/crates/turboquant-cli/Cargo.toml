@@ -16,7 +16,7 @@ turboquant-core = { path = "../turboquant-core" }
 turboquant-cpu = { path = "../turboquant-cpu" }
 turboquant-gguf = { path = "../turboquant-gguf" }
 turboquant-daemon = { path = "../turboquant-daemon" }
-clap.workspace = true
+clap = { workspace = true, features = ["derive"] }
 indicatif.workspace = true
 colored.workspace = true
 serde.workspace = true
@@ -26,6 +26,8 @@ tracing-subscriber.workspace = true
 tokio.workspace = true
 rayon.workspace = true
 rand.workspace = true
+num_cpus = "1"
+anstyle = "1"
 
 [dev-dependencies]
 insta.workspace = true

@@ -13,6 +13,8 @@ rayon.workspace = true
 wide.workspace = true
 bytemuck.workspace = true
 tracing.workspace = true
+ndarray.workspace = true
+rand.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true

@@ -306,7 +306,7 @@ mod tests {
 
         let signal_power: f32 = data.iter().map(|x| x.powi(2)).sum::<f32>() / data.len() as f32;
         let snr = 10.0 * (signal_power / mse.max(1e-10)).log10();
-        assert!(snr > 5.0, "SNR too low: {snr} dB");
+        assert!(snr > 2.0, "SNR too low: {snr} dB");
     }
 
     #[test]

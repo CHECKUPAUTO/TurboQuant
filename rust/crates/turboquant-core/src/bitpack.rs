@@ -178,7 +178,7 @@ mod tests {
 
     #[test]
     fn roundtrip_slice_4096() {
-        let values: Vec<u8> = (0..4096u8).map(|x| x % 8).collect();
+        let values: Vec<u8> = (0..4096u16).map(|x| (x % 8) as u8).collect();
         let packed = pack_3bit_slice(&values).unwrap();
         let unpacked = unpack_3bit_slice(&packed, 4096).unwrap();
         assert_eq!(values, unpacked);

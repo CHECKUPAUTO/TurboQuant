@@ -1,0 +1,9 @@
+/root/TurboQuant/rust/target/debug/deps/clap-50ff816e82e519d0.d: /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clap-4.5.27/src/lib.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clap-4.5.27/src/../examples/demo.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clap-4.5.27/src/../examples/demo.md
+
+/root/TurboQuant/rust/target/debug/deps/libclap-50ff816e82e519d0.rlib: /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clap-4.5.27/src/lib.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clap-4.5.27/src/../examples/demo.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clap-4.5.27/src/../examples/demo.md
+
+/root/TurboQuant/rust/target/debug/deps/libclap-50ff816e82e519d0.rmeta: /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clap-4.5.27/src/lib.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clap-4.5.27/src/../examples/demo.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clap-4.5.27/src/../examples/demo.md
+
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clap-4.5.27/src/lib.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clap-4.5.27/src/../examples/demo.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clap-4.5.27/src/../examples/demo.md:
