@@ -8,5 +8,5 @@ crates/turboquant-gguf/src/types.rs:
 crates/turboquant-gguf/src/writer.rs:
 Cargo.toml:
 
-# env-dep:CLIPPY_ARGS=-D__CLIPPY_HACKERY__warnings__CLIPPY_HACKERY__-W__CLIPPY_HACKERY__clippy::pedantic__CLIPPY_HACKERY__
+# env-dep:CLIPPY_ARGS=
 # env-dep:CLIPPY_CONF_DIR

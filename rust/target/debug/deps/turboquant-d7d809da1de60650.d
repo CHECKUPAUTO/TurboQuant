@@ -14,5 +14,5 @@ crates/turboquant-cli/src/commands/verify.rs:
 Cargo.toml:
 
 # env-dep:CARGO_PKG_VERSION=1.0.0-rc1
-# env-dep:CLIPPY_ARGS=-D__CLIPPY_HACKERY__warnings__CLIPPY_HACKERY__-W__CLIPPY_HACKERY__clippy::pedantic__CLIPPY_HACKERY__
+# env-dep:CLIPPY_ARGS=
 # env-dep:CLIPPY_CONF_DIR

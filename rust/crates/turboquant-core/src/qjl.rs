@@ -206,14 +206,13 @@ impl QjlQuantizer {
         let increment = 0.5_f32;
 
         let padded_len = num_values.next_multiple_of(8);
-        let quantized =
-            match unpack_3bit_slice(&block.packed, padded_len) {
-                Ok(u) => u,
-                Err(e) => {
-                    tracing::error!("Internal bit-unpacking error: {e}");
-                    return vec![0.0f32; num_values];
-                }
-            };
+        let quantized = match unpack_3bit_slice(&block.packed, padded_len) {
+            Ok(u) => u,
+            Err(e) => {
+                tracing::error!("Internal bit-unpacking error: {e}");
+                return vec![0.0f32; num_values];
+            }
+        };
 
         quantized
             .iter()
