@@ -1,0 +1,37 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    name: Build & Deploy Docs
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build rustdoc
+        run: cargo doc --manifest-path rust/Cargo.toml --workspace --no-deps
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+      - uses: peaceiris/actions-mdbook@v2
+        with:
+          mdbook-version: '0.4.44'
+      - name: Build mdBook
+        run: mdbook build rust/book
+      - name: Merge docs
+        run: |
+          mkdir -p public
+          cp -r rust/book/book-output/* public/
+          cp -r rust/target/doc public/rustdoc
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+      - uses: actions/deploy-pages@v4

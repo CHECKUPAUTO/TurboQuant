@@ -1,11 +1,17 @@
 #![deny(missing_docs)]
+// Clippy allows for practical numerical code
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
+#![allow(clippy::items_after_statements)]
+#![allow(clippy::new_without_default)]
 
-//! CPU backend for TurboQuant.
+//! CPU backend for `TurboQuant`.
 //!
 //! Provides a CPU implementation using rayon for parallelism
 //! and the `wide` crate for SIMD acceleration.
 
-use ndarray::ArrayView2;
+use ndarray::{Array2, ArrayView2};
 use rayon::prelude::*;
 use turboquant_core::kv_block::KvBlock;
 use turboquant_core::polar::PolarQuant;
@@ -15,6 +21,12 @@ use turboquant_core::rotation::QrRotation;
 /// CPU backend supporting all rotation and quantization operations.
 #[allow(dead_code)]
 pub struct CpuBackend;
+
+impl Default for CpuBackend {
+    fn default() -> Self {
+        Self
+    }
+}
 
 impl CpuBackend {
     /// Create a new CPU backend.
@@ -27,7 +39,7 @@ impl CpuBackend {
     /// let backend = CpuBackend::new();
     /// ```
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self
     }
 
@@ -48,18 +60,13 @@ impl CpuBackend {
         let config = QjlConfig::default();
         let quantizer = QjlQuantizer::new(config);
 
-        use ndarray::Array2;
         let tensor = Array2::from_shape_fn((num_heads, head_dim), |_| {
             (rand::random::<f32>() - 0.5) * 2.0
         });
 
         let start = std::time::Instant::now();
         for _ in 0..num_iterations {
-            let _ = turboquant_core::quantize::compress_tensor(
-                &polar,
-                &quantizer,
-                &tensor.view(),
-            );
+            let _ = turboquant_core::quantize::compress_tensor(&polar, &quantizer, &tensor.view());
         }
         let elapsed = start.elapsed();
 
@@ -109,8 +116,6 @@ impl CpuBackend {
         let config = QjlConfig::default();
         let quantizer = QjlQuantizer::new(config);
 
-        use ndarray::Array2;
-
         let start = std::time::Instant::now();
 
         let total_values = num_heads * head_dim;
@@ -118,12 +123,10 @@ impl CpuBackend {
         let mut v_blocks = Vec::with_capacity(num_heads);
 
         for _ in 0..num_heads {
-            let k_tensor = Array2::from_shape_fn((1, head_dim), |_| {
-                (rand::random::<f32>() - 0.5) * 2.0
-            });
-            let v_tensor = Array2::from_shape_fn((1, head_dim), |_| {
-                (rand::random::<f32>() - 0.5) * 2.0
-            });
+            let k_tensor =
+                Array2::from_shape_fn((1, head_dim), |_| (rand::random::<f32>() - 0.5) * 2.0);
+            let v_tensor =
+                Array2::from_shape_fn((1, head_dim), |_| (rand::random::<f32>() - 0.5) * 2.0);
             let polar = PolarQuant::new(rot.clone());
 
             if let Ok(block) =
@@ -139,11 +142,16 @@ impl CpuBackend {
         }
 
         let elapsed = start.elapsed();
-        let throughput_gbps =
-            (total_values * 4) as f64 / 1e9 / elapsed.as_secs_f64();
+        let throughput_gbps = (total_values * 4) as f64 / 1e9 / elapsed.as_secs_f64();
 
-        let k_mem: usize = k_blocks.iter().map(|b| b.memory_usage_bytes()).sum();
-        let v_mem: usize = v_blocks.iter().map(|b| b.memory_usage_bytes()).sum();
+        let k_mem: usize = k_blocks
+            .iter()
+            .map(turboquant_core::kv_block::KvBlock::memory_usage_bytes)
+            .sum();
+        let v_mem: usize = v_blocks
+            .iter()
+            .map(turboquant_core::kv_block::KvBlock::memory_usage_bytes)
+            .sum();
         let fp16_mem = total_values * 2 * 2;
 
         BenchmarkResults {
@@ -208,16 +216,14 @@ mod tests {
         let config = QjlConfig::default();
         let quantizer = QjlQuantizer::new(config);
 
-        use ndarray::Array2;
         let k_tensors: Vec<Array2<f32>> = (0..4)
-            .map(|_| {
-                Array2::from_shape_fn((1, 64), |_| (rand::random::<f32>() - 0.5) * 2.0)
-            })
+            .map(|_| Array2::from_shape_fn((1, 64), |_| (rand::random::<f32>() - 0.5) * 2.0))
             .collect();
 
         let vs: Vec<Array2<f32>> = k_tensors.clone();
-        let k_views: Vec<ArrayView2<f32>> = k_tensors.iter().map(|t| t.view()).collect();
-        let v_views: Vec<ArrayView2<f32>> = vs.iter().map(|t| t.view()).collect();
+        let k_views: Vec<ArrayView2<f32>> =
+            k_tensors.iter().map(ndarray::ArrayBase::view).collect();
+        let v_views: Vec<ArrayView2<f32>> = vs.iter().map(ndarray::ArrayBase::view).collect();
 
         let backend = CpuBackend::new();
         let (k_blocks, v_blocks) = backend

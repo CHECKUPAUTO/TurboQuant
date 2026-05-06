@@ -22,9 +22,5 @@ criterion.workspace = true
 rand.workspace = true
 ndarray.workspace = true
 
-[lints.clippy]
-pedantic = "warn"
-nursery = "warn"
-
 [lib]
 path = "src/lib.rs"

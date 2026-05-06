@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["bitpack","error","kv_block","polar","qjl","quantize","rotation"],"type":["Result"]};

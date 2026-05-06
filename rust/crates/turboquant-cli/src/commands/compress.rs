@@ -34,11 +34,7 @@ pub fn run(
         let path = Path::new(file);
 
         if !path.exists() {
-            eprintln!(
-                "{} File not found: {}",
-                "warning:".yellow().bold(),
-                file
-            );
+            eprintln!("{} File not found: {}", "warning:".yellow().bold(), file);
             continue;
         }
 
@@ -53,11 +49,7 @@ pub fn run(
 
         let data = std::fs::read(path)?;
         if data.len() < 4 || &data[0..4] != b"GGUF" {
-            eprintln!(
-                "{} Not a GGUF file: {}",
-                "warning:".yellow().bold(),
-                file
-            );
+            eprintln!("{} Not a GGUF file: {}", "warning:".yellow().bold(), file);
             continue;
         }
 

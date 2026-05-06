@@ -1,9 +1,9 @@
-//! PolarQuant: geometric rotation for KV cache compression.
+//! `PolarQuant`: geometric rotation for KV cache compression.
 
-use ndarray::ArrayViewMut2;
 use crate::rotation::Rotation;
+use ndarray::ArrayViewMut2;
 
-/// PolarQuant applies an orthogonal rotation before quantization.
+/// `PolarQuant` applies an orthogonal rotation before quantization.
 ///
 /// This spreads information uniformly across dimensions,
 /// making quantization error evenly distributed.
@@ -13,9 +13,9 @@ pub struct PolarQuant<R: Rotation> {
 }
 
 impl<R: Rotation> PolarQuant<R> {
-    /// Create a new PolarQuant with the given rotation strategy.
+    /// Create a new `PolarQuant` with the given rotation strategy.
     #[must_use]
-    pub fn new(rotation: R) -> Self {
+    pub const fn new(rotation: R) -> Self {
         Self { rotation }
     }
 
@@ -46,7 +46,7 @@ mod tests {
     fn test_polar_roundtrip() {
         let rot = QrRotation::new(64, Some(42));
         let pq = PolarQuant::new(rot);
-        let x = Array2::from_shape_fn((16, 64), |_| rand::random::<f32>() * 2.0 - 1.0);
+        let x = Array2::from_shape_fn((16, 64), |_| rand::random::<f32>().mul_add(2.0, -1.0));
         let mut y = x.clone();
         pq.forward(&mut y.view_mut());
         pq.inverse(&mut y.view_mut());

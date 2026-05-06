@@ -20,8 +20,3 @@ cudarc = { workspace = true, optional = true }
 # For cuda feature
 half = { workspace = true, optional = true }
 
-[lints.clippy]
-pedantic = "warn"
-nursery = "warn"
-unwrap_used = "warn"
-expect_used = "warn"

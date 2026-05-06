@@ -1,0 +1,30 @@
+[Unit]
+Description=TurboQuant KV Cache Compression Daemon
+Documentation=https://github.com/CHECKUPAUTO/TurboQuant
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=turboquant
+Group=turboquant
+ExecStart=/usr/local/bin/turboquant daemon
+Restart=on-failure
+RestartSec=5
+WatchdogSec=60
+
+# Security hardening
+ProtectSystem=strict
+ProtectHome=read-only
+NoNewPrivileges=true
+MemoryMax=2G
+PrivateTmp=true
+ReadWritePaths=/var/lib/turboquant
+ReadOnlyPaths=/etc/turboquant
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

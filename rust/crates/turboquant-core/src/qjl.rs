@@ -77,13 +77,13 @@ pub struct QjlQuantizer {
 impl QjlQuantizer {
     /// Create a new QJL quantizer with the given config.
     #[must_use]
-    pub fn new(config: QjlConfig) -> Self {
+    pub const fn new(config: QjlConfig) -> Self {
         Self { config }
     }
 
     /// Return the configuration.
     #[must_use]
-    pub fn config(&self) -> &QjlConfig {
+    pub const fn config(&self) -> &QjlConfig {
         &self.config
     }
 
@@ -102,8 +102,8 @@ impl QjlQuantizer {
             }
             ScaleMode::Adaptive => {
                 let mean = block.iter().sum::<f32>() / block.len() as f32;
-                let variance = block.iter().map(|x| (x - mean).powi(2)).sum::<f32>()
-                    / block.len() as f32;
+                let variance =
+                    block.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / block.len() as f32;
                 variance.sqrt().max(1e-8)
             }
             ScaleMode::Fixed(s) => s,
@@ -130,6 +130,7 @@ impl QjlQuantizer {
     /// assert_eq!(decompressed.len(), 64);
     /// ```
     #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+    #[must_use]
     pub fn quantize_block(&self, block: &[f32]) -> CompressedBlock {
         let scale = self.compute_scale(block);
         let half_range = 3.5_f32; // (8-1)/2 for 3-bit
@@ -176,8 +177,7 @@ impl QjlQuantizer {
         let padded_len = num_values.next_multiple_of(8);
         let mut padded_quant = quantized;
         padded_quant.resize(padded_len, 0);
-        let packed = pack_3bit_slice(&padded_quant)
-            .expect("quantized values should be packable");
+        let packed = pack_3bit_slice(&padded_quant).expect("quantized values should be packable");
 
         CompressedBlock {
             packed,
@@ -196,22 +196,27 @@ impl QjlQuantizer {
         let increment = 0.5_f32;
 
         let padded_len = num_values.next_multiple_of(8);
-        let quantized = unpack_3bit_slice(&block.packed, padded_len)
-            .expect("packed data should be unpackable");
+        let quantized =
+            unpack_3bit_slice(&block.packed, padded_len).expect("packed data should be unpackable");
 
         quantized
             .iter()
             .take(num_values)
             .enumerate()
             .map(|(i, &q)| {
-                let q_float = (q as f32 - half_range / increment) * increment;
+                let q_float = (f32::from(q) - half_range / increment) * increment;
                 let mut val = q_float / half_range * scale;
 
                 // Apply 1-bit correction if available
                 if let Some(ref signs) = block.correction_bits {
-                    if let CorrectionMode::OneBitResidual { learned_scale } = self.config.correction {
+                    if let CorrectionMode::OneBitResidual { learned_scale } = self.config.correction
+                    {
                         let sign_bit = (signs[i / 8] >> (i % 8)) & 1;
-                        let correction = if sign_bit == 1 { learned_scale } else { -learned_scale };
+                        let correction = if sign_bit == 1 {
+                            learned_scale
+                        } else {
+                            -learned_scale
+                        };
                         val += correction * scale;
                     }
                 }
@@ -288,7 +293,9 @@ mod tests {
     #[test]
     fn test_quantize_dequantize_with_correction() {
         let config = QjlConfig {
-            correction: CorrectionMode::OneBitResidual { learned_scale: 0.01 },
+            correction: CorrectionMode::OneBitResidual {
+                learned_scale: 0.01,
+            },
             ..Default::default()
         };
         let quantizer = QjlQuantizer::new(config);

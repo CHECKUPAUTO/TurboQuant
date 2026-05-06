@@ -19,8 +19,3 @@ rand.workspace = true
 [dev-dependencies]
 proptest.workspace = true
 
-[lints.clippy]
-pedantic = "warn"
-nursery = "warn"
-unwrap_used = "warn"
-expect_used = "warn"

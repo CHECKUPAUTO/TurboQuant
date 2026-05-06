@@ -2,7 +2,7 @@
 
 use thiserror::Error;
 
-/// Errors that can occur during TurboQuant operations.
+/// Errors that can occur during `TurboQuant` operations.
 #[derive(Error, Debug)]
 pub enum TurboQuantError {
     /// Generic I/O error.

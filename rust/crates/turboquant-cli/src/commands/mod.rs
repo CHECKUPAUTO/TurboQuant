@@ -1,4 +1,4 @@
-//! Command implementations for the TurboQuant CLI.
+//! Command implementations for the `TurboQuant` CLI.
 
 pub mod audit;
 pub mod bench;

@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Configuration for the TurboQuant daemon.
+/// Configuration for the `TurboQuant` daemon.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaemonConfig {
     /// Directories to watch for new models.

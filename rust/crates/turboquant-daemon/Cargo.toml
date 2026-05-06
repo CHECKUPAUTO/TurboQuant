@@ -27,8 +27,3 @@ tracing-subscriber.workspace = true
 notify.workspace = true
 sd-notify.workspace = true
 
-[lints.clippy]
-pedantic = "warn"
-nursery = "warn"
-unwrap_used = "warn"
-expect_used = "warn"

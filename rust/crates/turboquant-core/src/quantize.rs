@@ -1,6 +1,6 @@
 //! Quantization pipeline: combines rotation + QJL quantization.
 
-use ndarray::{ArrayView, ArrayView2, Array3, Ix4};
+use ndarray::{Array3, ArrayView, ArrayView2, Ix4};
 
 use crate::kv_block::KvBlock;
 use crate::polar::PolarQuant;
@@ -10,7 +10,7 @@ use crate::rotation::Rotation;
 /// Type alias for 3D array view.
 /// Type alias for 4D array view.
 type ArrayView4<'a, A> = ArrayView<'a, A, Ix4>;
-/// Type alias for mutable 4D array (batch, seq, heads, head_dim).
+/// Type alias for mutable 4D array (batch, seq, heads, `head_dim`).
 type ArrayViewMut4<'a, A> = ndarray::ArrayViewMut<'a, A, Ix4>;
 
 /// Statistics for attention forward pass comparison.
@@ -26,9 +26,9 @@ pub struct AttentionStats {
     pub mse: f32,
 }
 
-/// Compress a full 2D tensor (heads × head_dim) to packed format.
+/// Compress a full 2D tensor (heads × `head_dim`) to packed format.
 ///
-/// Applies PolarQuant rotation + QJL quantization per block.
+/// Applies `PolarQuant` rotation + QJL quantization per block.
 #[allow(clippy::cast_possible_truncation)]
 pub fn compress_tensor<R: Rotation>(
     polar: &PolarQuant<R>,
@@ -45,11 +45,8 @@ pub fn compress_tensor<R: Rotation>(
 
     for h in 0..num_heads {
         let row = tensor.row(h);
-        let mut rotated = ndarray::Array2::from_shape_vec(
-            (1, head_dim),
-            row.to_vec(),
-        )
-        .map_err(|e| crate::error::TurboQuantError::CompressionError(e.to_string()))?;
+        let mut rotated = ndarray::Array2::from_shape_vec((1, head_dim), row.to_vec())
+            .map_err(|e| crate::error::TurboQuantError::CompressionError(e.to_string()))?;
 
         polar.forward(&mut rotated.view_mut());
 
@@ -77,7 +74,7 @@ pub fn compress_tensor<R: Rotation>(
     Ok(kv_block)
 }
 
-/// Decompress a KvBlock back to a 3D tensor.
+/// Decompress a `KvBlock` back to a 3D tensor.
 ///
 /// # Errors
 ///
@@ -123,12 +120,16 @@ pub fn decompress_tensor(
     Ok(result)
 }
 
-/// Reference TurboQuant attention forward pass.
+/// Reference `TurboQuant` attention forward pass.
 ///
 /// Decompresses K/V from the cache and computes attention.
-/// Q shape: (batch, seq_len_q, num_heads, head_dim)
-/// Output shape: (batch, seq_len_q, num_heads, head_dim)
-#[allow(clippy::cast_precision_loss, clippy::many_arguments, clippy::needless_range_loop)]
+/// Q shape: (batch, `seq_len_q`, `num_heads`, `head_dim`)
+/// Output shape: (batch, `seq_len_q`, `num_heads`, `head_dim`)
+#[allow(
+    clippy::cast_precision_loss,
+    clippy::too_many_arguments,
+    clippy::needless_range_loop
+)]
 pub fn turbo_attention_forward(
     q: &ArrayView4<f32>,
     k_cache: &KvBlock,
@@ -212,18 +213,17 @@ mod tests {
         let config = QjlConfig {
             block_size: 64,
             scale_mode: ScaleMode::PerBlockAbsMax,
-            correction: CorrectionMode::OneBitResidual { learned_scale: 0.01 },
+            correction: CorrectionMode::OneBitResidual {
+                learned_scale: 0.01,
+            },
             ..Default::default()
         };
         let quantizer = QjlQuantizer::new(config);
 
-        let tensor = Array2::from_shape_fn((4, 64), |_| {
-            (rand::random::<f32>() - 0.5) * 2.0
-        });
+        let tensor = Array2::from_shape_fn((4, 64), |_| (rand::random::<f32>() - 0.5) * 2.0);
 
         let compressed = compress_tensor(&polar, &quantizer, &tensor.view()).unwrap();
-        let decompressed =
-            decompress_tensor(&quantizer, &compressed, 4, 64).unwrap();
+        let decompressed = decompress_tensor(&quantizer, &compressed, 4, 64).unwrap();
 
         assert_eq!(decompressed.shape(), &[4, 1, 64]);
     }

@@ -1,0 +1,12 @@
+[book]
+authors = ["CHECKUPAUTO"]
+language = "en"
+multilingual = false
+src = "src"
+title = "TurboQuant Guide"
+
+[build]
+build-dir = "book-output"
+
+[output.html]
+mathjax-support = true

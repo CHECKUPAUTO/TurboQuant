@@ -52,10 +52,7 @@ pub fn run(path: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
 
     println!();
     println!("{}", "Audit Results:".bold().green());
-    println!(
-        "  GGUF files found:      {}",
-        gguf_count.to_string().cyan()
-    );
+    println!("  GGUF files found:      {}", gguf_count.to_string().cyan());
     println!(
         "  Total size:            {} MB",
         (total_size / (1024 * 1024)).to_string().yellow()
@@ -66,8 +63,16 @@ pub fn run(path: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
     );
     println!(
         "  Estimated savings:     {} MB ({}×)",
-        ((total_size - estimated_compressed) / (1024 * 1024)).to_string().bright_green().bold(),
-        format!("{:.1}", total_size as f64 / estimated_compressed.max(1) as f64).bright_green().bold()
+        ((total_size - estimated_compressed) / (1024 * 1024))
+            .to_string()
+            .bright_green()
+            .bold(),
+        format!(
+            "{:.1}",
+            total_size as f64 / estimated_compressed.max(1) as f64
+        )
+        .bright_green()
+        .bold()
     );
 
     Ok(())

@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 
-//! TurboQuant daemon library.
+//! `TurboQuant` daemon library.
 //!
 //! Provides the daemon runtime: filesystem watching, Ollama model audit,
 //! and HTTP API server.

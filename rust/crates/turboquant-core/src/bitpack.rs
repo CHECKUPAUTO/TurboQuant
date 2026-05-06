@@ -83,9 +83,7 @@ pub fn unpack_3bit(packed: &[u8], out: &mut [u8]) {
 /// ```
 pub fn pack_3bit_slice(values: &[u8]) -> crate::Result<Vec<u8>> {
     if values.len() % 8 != 0 {
-        return Err(crate::error::TurboQuantError::UnalignedData {
-            len: values.len(),
-        });
+        return Err(crate::error::TurboQuantError::UnalignedData { len: values.len() });
     }
     let mut out = vec![0u8; values.len() * 3 / 8];
     for (i, chunk) in values.chunks_exact(8).enumerate() {

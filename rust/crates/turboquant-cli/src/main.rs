@@ -1,16 +1,22 @@
 #![deny(missing_docs)]
+// Suppress pedantic clippy lints in CLI code
+#![allow(clippy::unnecessary_wraps)]
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
+#![allow(clippy::items_after_statements)]
+#![allow(clippy::needless_pass_by_value)]
 
-//! TurboQuant CLI — 3-bit KV cache compression toolkit.
+//! `TurboQuant` CLI — 3-bit KV cache compression toolkit.
 //!
 //! Usage: `turboquant <COMMAND>`
 
 use clap::{Parser, Subcommand, ValueHint};
 use colored::Colorize;
 
-
 mod commands;
 
-/// TurboQuant 1.0.0 — 3-bit KV cache compression toolkit
+/// `TurboQuant` 1.0.0 — 3-bit KV cache compression toolkit
 #[derive(Parser)]
 #[command(name = "turboquant")]
 #[command(version = "1.0.0-rc1")]
@@ -129,7 +135,7 @@ pub enum Commands {
 }
 
 /// Custom style for the CLI help.
-fn clap_style() -> clap::builder::Styles {
+const fn clap_style() -> clap::builder::Styles {
     clap::builder::Styles::styled()
         .header(
             anstyle::Style::new()
@@ -145,20 +151,23 @@ fn clap_style() -> clap::builder::Styles {
             anstyle::Style::new()
                 .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::BrightGreen))),
         )
-        .placeholder(anstyle::Style::new().fg_color(Some(anstyle::Color::Ansi(
-            anstyle::AnsiColor::BrightYellow,
-        ))))
+        .placeholder(
+            anstyle::Style::new()
+                .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::BrightYellow))),
+        )
         .error(
             anstyle::Style::new()
                 .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::BrightRed)))
                 .bold(),
         )
-        .valid(anstyle::Style::new().fg_color(Some(anstyle::Color::Ansi(
-            anstyle::AnsiColor::BrightGreen,
-        ))))
-        .invalid(anstyle::Style::new().fg_color(Some(anstyle::Color::Ansi(
-            anstyle::AnsiColor::BrightRed,
-        ))))
+        .valid(
+            anstyle::Style::new()
+                .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::BrightGreen))),
+        )
+        .invalid(
+            anstyle::Style::new()
+                .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::BrightRed))),
+        )
 }
 
 fn main() {
@@ -194,9 +203,7 @@ fn main() {
             num_heads,
             iterations,
         } => commands::bench::run(head_dim, seq_len, num_heads, iterations),
-        Commands::Calibrate { data_path, output } => {
-            commands::calibrate::run(data_path, output)
-        }
+        Commands::Calibrate { data_path, output } => commands::calibrate::run(data_path, output),
         Commands::Audit { path } => commands::audit::run(path),
         Commands::Info => commands::info::run(),
         Commands::Daemon { config } => commands::daemon::run(config),

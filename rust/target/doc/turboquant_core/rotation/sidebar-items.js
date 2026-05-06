@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["FastHadamardRotation","HouseholderRotation","QrRotation"],"trait":["Rotation"]};

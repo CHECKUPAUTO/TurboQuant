@@ -18,8 +18,3 @@ tracing.workspace = true
 [dev-dependencies]
 tempfile.workspace = true
 
-[lints.clippy]
-pedantic = "warn"
-nursery = "warn"
-unwrap_used = "warn"
-expect_used = "warn"

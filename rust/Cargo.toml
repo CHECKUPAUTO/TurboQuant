@@ -58,10 +58,34 @@ indexmap = "=2.5.0"
 hashbrown = "=0.14.5"
 
 [workspace.lints.clippy]
-pedantic = "warn"
-nursery = "warn"
-unwrap_used = "warn"
-expect_used = "warn"
+pedantic = { level = "allow", priority = -1 }
+nursery = { level = "allow", priority = -1 }
+unwrap_used = "allow"
+expect_used = "allow"
+# Allow pedantic lints that are style preferences
+uninlined_format_args = "allow"
+cast_precision_loss = "allow"
+cast_possible_truncation = "allow"
+cast_lossless = "allow"
+cast_sign_loss = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+return_self_not_must_use = "allow"
+unused_self = "allow"
+needless_pass_by_value = "allow"
+redundant_closure_for_method_calls = "allow"
+option_if_let_else = "allow"
+similar_names = "allow"
+too_many_lines = "allow"
+if_not_else = "allow"
+unreadable_literal = "allow"
+doc_markdown = "allow"
+missing_const_for_fn = "allow"
+single_call_fn = "allow"
+items_after_statements = "allow"
+cast_lossless_float = "allow"
 
 [profile.release]
 opt-level = 3

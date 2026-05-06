@@ -1,4 +1,4 @@
-//! Orthogonal rotation matrices for PolarQuant.
+//! Orthogonal rotation matrices for `PolarQuant`.
 //!
 //! Three strategies:
 //! - QR decomposition (baseline, O(d²) apply)
@@ -51,9 +51,7 @@ impl QrRotation {
             rand::SeedableRng::from_entropy()
         };
 
-        let h: Array2<f32> = Array2::from_shape_fn((dim, dim), |_| {
-            rng.sample(StandardNormal)
-        });
+        let h: Array2<f32> = Array2::from_shape_fn((dim, dim), |_| rng.sample(StandardNormal));
 
         // QR decomposition via Gram-Schmidt
         let mut q = Array2::<f32>::zeros((dim, dim));
@@ -62,7 +60,7 @@ impl QrRotation {
             for i in 0..j {
                 let qi = q.column(i);
                 let dot = v.dot(&qi);
-                v = v - &(qi.mapv(|x| x * dot));
+                v -= &(qi.mapv(|x| x * dot));
             }
             let norm = v.dot(&v).sqrt();
             if norm > 1e-10 {
@@ -133,16 +131,17 @@ impl HouseholderRotation {
         };
 
         let reflectors: Vec<Array1<f32>> = (0..num_reflectors)
-            .map(|_| {
-                Array1::from_shape_fn(dim, |_| rng.sample(StandardNormal))
-            })
+            .map(|_| Array1::from_shape_fn(dim, |_| rng.sample(StandardNormal)))
             .collect();
 
         debug!(
             "Created HouseholderRotation(dim={}, k={})",
             dim, num_reflectors
         );
-        Self { dimension: dim, reflectors }
+        Self {
+            dimension: dim,
+            reflectors,
+        }
     }
 
     /// Apply a Householder reflector: `v -> v - 2·(v·u)/(u·u)·u`.
@@ -165,7 +164,7 @@ impl HouseholderRotation {
 impl HouseholderRotation {
     /// Return the dimension of the rotation.
     #[must_use]
-    pub fn dim(&self) -> usize {
+    pub const fn dim(&self) -> usize {
         self.dimension
     }
 }
@@ -223,7 +222,10 @@ impl FastHadamardRotation {
             .collect();
 
         debug!("Created FastHadamardRotation(dim={})", dim);
-        Self { dimension: dim, signs }
+        Self {
+            dimension: dim,
+            signs,
+        }
     }
 
     /// In-place Fast Hadamard Transform (Walsh-Hadamard).
@@ -248,7 +250,7 @@ impl FastHadamardRotation {
 impl FastHadamardRotation {
     /// Return the dimension of the rotation.
     #[must_use]
-    pub fn dim(&self) -> usize {
+    pub const fn dim(&self) -> usize {
         self.dimension
     }
 }
@@ -318,7 +320,7 @@ mod tests {
 
     fn test_rotation_roundtrip<R: Rotation>(rot: &R) {
         let dim = rot.dim();
-        let x_arr = Array2::from_shape_fn((16, dim), |_| rand::random::<f32>() * 2.0 - 1.0);
+        let x_arr = Array2::from_shape_fn((16, dim), |_| rand::random::<f32>().mul_add(2.0, -1.0));
         let mut x = x_arr.clone();
         rot.forward(&mut x.view_mut());
         rot.inverse(&mut x.view_mut());
@@ -361,16 +363,14 @@ mod tests {
     #[test]
     fn test_qr_preserves_norm() {
         let rot = QrRotation::new(64, Some(42));
-        let x = Array2::from_shape_fn((1, 64), |_| rand::random::<f32>() * 2.0 - 1.0);
+        let x = Array2::from_shape_fn((1, 64), |_| rand::random::<f32>().mul_add(2.0, -1.0));
         let norm_before = x.dot(&x.t())[[0, 0]].sqrt();
-        let mut y = x.clone();
+        let mut y = x;
         rot.forward(&mut y.view_mut());
         let norm_after = y.dot(&y.t())[[0, 0]].sqrt();
         assert!(
             (norm_before - norm_after).abs() < 1e-4,
-            "Norm not preserved: {} vs {}",
-            norm_before,
-            norm_after
+            "Norm not preserved: {norm_before} vs {norm_after}"
         );
     }
 }

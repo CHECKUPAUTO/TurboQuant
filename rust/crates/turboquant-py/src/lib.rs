@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 
-//! Python bindings for TurboQuant via pyo3.
+//! Python bindings for `TurboQuant` via pyo3.
 //!
 //! Provides drop-in API compatibility with `legacy/python/turboquant.py`.
 

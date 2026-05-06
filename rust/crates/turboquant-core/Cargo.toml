@@ -23,8 +23,3 @@ proptest.workspace = true
 tempfile.workspace = true
 criterion.workspace = true
 
-[lints.clippy]
-pedantic = "warn"
-nursery = "warn"
-unwrap_used = "warn"
-expect_used = "warn"

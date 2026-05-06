@@ -6,7 +6,7 @@ pub struct GgufWriter;
 impl GgufWriter {
     /// Create a new GGUF writer.
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self
     }
 }

@@ -56,11 +56,17 @@ impl KvBlock {
     /// # Errors
     ///
     /// Returns an error if the range is invalid or unaligned.
-    pub fn store(&mut self, range: Range<usize>, packed_data: &[u8], scales: &[f16]) -> crate::Result<()> {
+    pub fn store(
+        &mut self,
+        range: Range<usize>,
+        packed_data: &[u8],
+        scales: &[f16],
+    ) -> crate::Result<()> {
         if range.end > self.seq_len {
-            return Err(crate::error::TurboQuantError::CompressionError(
-                format!("Range {:?} exceeds seq_len {}", range, self.seq_len)
-            ));
+            return Err(crate::error::TurboQuantError::CompressionError(format!(
+                "Range {:?} exceeds seq_len {}",
+                range, self.seq_len
+            )));
         }
 
         let values_per_position = self.head_dim;
@@ -69,13 +75,11 @@ impl KvBlock {
 
         if byte_offset + byte_len > self.data.len() {
             return Err(crate::error::TurboQuantError::CompressionError(
-                "Packed data overflow".into()
+                "Packed data overflow".into(),
             ));
         }
 
-        self.data[byte_offset..byte_offset + byte_len].copy_from_slice(
-            &packed_data[..byte_len]
-        );
+        self.data[byte_offset..byte_offset + byte_len].copy_from_slice(&packed_data[..byte_len]);
 
         let scale_start = range.start * self.head_dim / self.block_size;
         let scale_end = range.end * self.head_dim / self.block_size;

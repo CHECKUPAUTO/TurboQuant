@@ -6,7 +6,7 @@ fn bench_pack_3bit(c: &mut Criterion) {
     let mut rng = rand::thread_rng();
     let sizes = [64, 256, 1024, 4096];
 
-    for &n in sizes {
+    for n in sizes {
         let values: Vec<u8> = (0..n).map(|_| rng.gen_range(0..8u8)).collect();
         c.bench_function(&format!("pack_3bit_{n}"), |b| {
             b.iter(|| pack_3bit_slice(black_box(&values)).unwrap());

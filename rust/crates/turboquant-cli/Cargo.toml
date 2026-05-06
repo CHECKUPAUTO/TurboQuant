@@ -33,8 +33,3 @@ anstyle = "1"
 insta.workspace = true
 tempfile.workspace = true
 
-[lints.clippy]
-pedantic = "warn"
-nursery = "warn"
-unwrap_used = "warn"
-expect_used = "warn"

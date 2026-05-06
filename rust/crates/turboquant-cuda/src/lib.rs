@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 
-//! CUDA backend for TurboQuant.
+//! CUDA backend for `TurboQuant`.
 //!
 //! Feature-gated via the `cuda` feature. Uses `cudarc` for GPU kernels.
 
