@@ -177,7 +177,17 @@ impl QjlQuantizer {
         let padded_len = num_values.next_multiple_of(8);
         let mut padded_quant = quantized;
         padded_quant.resize(padded_len, 0);
-        let packed = pack_3bit_slice(&padded_quant).expect("quantized values should be packable");
+        let packed = match pack_3bit_slice(&padded_quant) {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::error!("Internal bit-packing error: {e}");
+                return CompressedBlock {
+                    packed: Vec::new(),
+                    scale: f16::from_f32(scale),
+                    correction_bits: None,
+                };
+            }
+        };
 
         CompressedBlock {
             packed,
@@ -197,7 +207,13 @@ impl QjlQuantizer {
 
         let padded_len = num_values.next_multiple_of(8);
         let quantized =
-            unpack_3bit_slice(&block.packed, padded_len).expect("packed data should be unpackable");
+            match unpack_3bit_slice(&block.packed, padded_len) {
+                Ok(u) => u,
+                Err(e) => {
+                    tracing::error!("Internal bit-unpacking error: {e}");
+                    return vec![0.0f32; num_values];
+                }
+            };
 
         quantized
             .iter()
