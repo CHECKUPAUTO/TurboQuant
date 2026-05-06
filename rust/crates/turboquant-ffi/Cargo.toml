@@ -1,0 +1,25 @@
+[package]
+name = "turboquant-ffi"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "C FFI bindings for TurboQuant"
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[build-dependencies]
+cbindgen.workspace = true
+
+[dependencies]
+turboquant-core = { path = "../turboquant-core" }
+libc.workspace = true
+bytemuck.workspace = true
+
+[lints.clippy]
+pedantic = "warn"
+nursery = "warn"
+unwrap_used = "warn"
+expect_used = "warn"

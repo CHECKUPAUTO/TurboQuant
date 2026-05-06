@@ -1,0 +1,34 @@
+[package]
+name = "turboquant-daemon"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "TurboQuant daemon: systemd service for Ollama model audit and compression"
+
+[lib]
+name = "turboquant_daemon"
+path = "src/lib.rs"
+
+[[bin]]
+name = "turboquant-daemon"
+path = "src/main.rs"
+
+[dependencies]
+turboquant-core = { path = "../turboquant-core" }
+turboquant-gguf = { path = "../turboquant-gguf" }
+tokio.workspace = true
+axum.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+notify.workspace = true
+sd-notify.workspace = true
+
+[lints.clippy]
+pedantic = "warn"
+nursery = "warn"
+unwrap_used = "warn"
+expect_used = "warn"

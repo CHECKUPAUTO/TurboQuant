@@ -1,0 +1,27 @@
+[package]
+name = "turboquant-cuda"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "CUDA backend for TurboQuant (feature-gated via cudarc)"
+
+[features]
+default = []
+cuda = ["cudarc", "cudarc/nvrtc"]
+
+[dependencies]
+turboquant-core = { path = "../turboquant-core" }
+bytemuck.workspace = true
+tracing.workspace = true
+cudarc = { workspace = true, optional = true }
+
+# For cuda feature
+half = { workspace = true, optional = true }
+
+[lints.clippy]
+pedantic = "warn"
+nursery = "warn"
+unwrap_used = "warn"
+expect_used = "warn"

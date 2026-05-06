@@ -1,0 +1,24 @@
+[package]
+name = "turboquant-py"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Python bindings for TurboQuant via pyo3 + maturin"
+
+[lib]
+crate-type = ["cdylib"]
+name = "turboquant_py"
+
+[dependencies]
+turboquant-core = { path = "../turboquant-core" }
+pyo3.workspace = true
+numpy.workspace = true
+half.workspace = true
+
+[lints.clippy]
+pedantic = "warn"
+nursery = "warn"
+unwrap_used = "warn"
+expect_used = "warn"

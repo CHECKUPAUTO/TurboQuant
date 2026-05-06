@@ -1,0 +1,25 @@
+[package]
+name = "turboquant-gguf"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "GGUF I/O for TurboQuant: parsing, writing, cache-type turbo3 support"
+
+[dependencies]
+turboquant-core = { path = "../turboquant-core" }
+byteorder.workspace = true
+memmap2.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints.clippy]
+pedantic = "warn"
+nursery = "warn"
+unwrap_used = "warn"
+expect_used = "warn"

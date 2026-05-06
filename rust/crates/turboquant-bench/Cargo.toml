@@ -1,0 +1,30 @@
+[package]
+name = "turboquant-bench"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Criterion benchmarks for TurboQuant"
+
+[[bench]]
+name = "compression"
+harness = false
+
+[[bench]]
+name = "rotation"
+harness = false
+
+[dependencies]
+turboquant-core = { path = "../turboquant-core" }
+turboquant-cpu = { path = "../turboquant-cpu" }
+criterion.workspace = true
+rand.workspace = true
+ndarray.workspace = true
+
+[lints.clippy]
+pedantic = "warn"
+nursery = "warn"
+
+[lib]
+path = "src/lib.rs"
