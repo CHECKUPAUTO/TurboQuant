@@ -29,19 +29,22 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
-      - run: cargo clippy --manifest-path rust/Cargo.toml --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic
+      # --all-features would enable turboquant-cuda's `cuda` feature, whose cudarc
+      # build script requires a CUDA toolkit — absent on GitHub runners.
+      - run: cargo clippy --manifest-path rust/Cargo.toml --workspace --all-targets -- -D warnings -W clippy::pedantic
 
   check:
     name: Check
     strategy:
       matrix:
         os: [ubuntu-22.04, ubuntu-24.04]
-        features: ["", "--features cpu"]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo check --manifest-path rust/Cargo.toml --workspace ${{ matrix.features }}
+      # Note: the CPU backend is the turboquant-cpu crate (built as part
+      # of the workspace); there is no `cpu` cargo feature.
+      - run: cargo check --manifest-path rust/Cargo.toml --workspace
 
   test:
     name: Test
@@ -52,7 +55,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo test --manifest-path rust/Cargo.toml --workspace --all-features
+      - run: cargo test --manifest-path rust/Cargo.toml --workspace
 
   doc:
     name: Docs

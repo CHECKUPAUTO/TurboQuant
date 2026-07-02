@@ -24,7 +24,7 @@ jobs:
         with:
           targets: ${{ matrix.target }}
       - name: Build release
-        run: cargo build --manifest-path rust/Cargo.toml --release --workspace --features=cpu --target ${{ matrix.target }}
+        run: cargo build --manifest-path rust/Cargo.toml --release --workspace --target ${{ matrix.target }}
       - name: Package
         shell: bash
         run: |

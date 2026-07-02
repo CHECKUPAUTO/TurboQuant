@@ -364,19 +364,146 @@ theoretical sizes. No CUDA memory query (e.g., `torch.cuda.memory_allocated()`).
 
 ---
 
+## Bugs Introduced (and Fixed) in the Rust Port — 2026-07 audit
+
+The Rust port itself shipped with new defects. These were found and fixed
+during the 2026-07 audit; each entry lists the regression test that now
+guards it.
+
+### Bug R1: QJL 3-bit grid collapse — every positive value decoded to 0.0
+
+**Severity**: CRITICAL — the quantizer destroyed half of its input.
+
+**Rust code** (`turboquant-core/src/qjl.rs`, `quantize_block`): the code
+mapped `x_norm ∈ [-1, 1]` onto a 15-level half-step grid
+(`increment = 0.5`, `half_range = 3.5`) and then clamped the resulting
+index to `[0, 7]`. Every positive input saturated at index 7, which the
+dequantizer decoded as `0.0`. Measured round-trip SNR on Gaussian data:
+**2.9 dB** (i.e., the "compressed" signal was mostly noise).
+
+**Fix**: proper symmetric 8-level 3-bit grid
+`{-3.5, -2.5, -1.5, -0.5, +0.5, +1.5, +2.5, +3.5}` (spacing 1.0):
+`idx = clamp(round(x_norm·3.5 + 3.5), 0, 7)`, dequant
+`(idx − 3.5)/3.5 · scale`. Measured SNR after fix: **~13 dB** without
+correction, **~19 dB** with the default 1-bit correction.
+
+**Tests**: `src/qjl.rs` — `test_positive_values_roundtrip_positive`,
+`test_quantize_dequantize_with_correction` (threshold raised from the
+bug-masking `> 2 dB` to `> 12 dB`), `test_dot_product_preserved`.
+
+### Bug R2: Residual sign computed in mixed units
+
+**Severity**: HIGH — the 1-bit correction pushed values the wrong way.
+
+`residual = x_norm - q_clamped` compared a normalized value (`[-1, 1]`)
+against a level-unit value (`[-3.5, 3.5]`), so for positive inputs the
+correction sign was always negative. Fixed by computing the residual in
+level units: `residual = x_norm·3.5 − (idx − 3.5)`.
+
+**Test**: `src/qjl.rs` — `test_correction_improves_snr`.
+
+### Bug R3: 1-bit correction default too small (0.01)
+
+**Severity**: MEDIUM — with the old code, enabling the correction made
+reconstruction *worse* than no correction (measured 2.71 dB vs 2.88 dB).
+
+With the fixed grid, the residual is ~uniform in ±0.5 level units, so the
+MSE-optimal fixed 1-bit correction is a quarter step: 0.25 level units =
+`0.25 / 3.5 ≈ 0.0714` in normalized units. That is now the documented
+default (`QjlConfig::default()`); the field remains configurable.
+
+**Test**: `src/qjl.rs` — `test_correction_improves_snr`.
+
+### Bug R4: Multi-block position collision in the tensor pipeline
+
+**Severity**: CRITICAL — silent data corruption for `head_dim > block_size`.
+
+`compress_tensor` stored block `b` of head `h` at position `h + b`
+(colliding across heads: head 1's first block landed on head 0's second),
+with per-position byte/scale counts that did not match what
+`KvBlock::store` expected, and `decompress_tensor` used yet another
+indexing. `KvBlock`'s scale indexing (`pos · head_dim / block_size`) also
+collided for positions with multiple blocks.
+
+**Fix**: one `KvBlock` position per input row (contiguous packed bytes +
+`head_dim.div_ceil(block_size)` scales per position); `KvBlock::store` /
+`retrieve_scales` now index scales by `scales_per_position()` and validate
+input lengths instead of panicking.
+
+**Tests**: `src/quantize.rs` —
+`test_multi_block_positions_do_not_collide` (head_dim = 2×block_size,
+4 heads), `test_various_shapes_roundtrip`;
+`tests/kv_block_roundtrip.rs` — `multi_scale_per_position_roundtrip`.
+
+### Bug R5: `turbo_attention_forward` returned hardcoded statistics
+
+**Severity**: HIGH — quality claims were fabricated.
+
+The function returned `{snr_db: 20.0, cosine_similarity: 0.98,
+max_abs_error: 0.01, mse: 0.0001}` regardless of input. It now computes
+real statistics by comparing the fully-quantized attention path (Q
+round-tripped through the quantizer, K/V from the compressed cache)
+against the float-Q path written to `out`; end-to-end parity against
+float attention is asserted in the test suite. The unused `mask` argument
+is now honoured (additive score mask). Public signature unchanged.
+
+**Tests**: `tests/attention_parity.rs` — output-vs-float-reference SNR
+> 12 dB and cosine > 0.96, plus anti-hardcoding checks (stats must change
+when inputs change and must not equal the old constants).
+
+### Bug R6: 1-bit correction signs were silently dropped by the pipeline
+
+**Severity**: MEDIUM — the QJL correction never survived storage.
+
+`compress_tensor` computed the correction bits and threw them away
+(`KvBlock` had no storage for them), so the decompressed tensors were
+grid-only (~13 dB). `KvBlock` now has an optional `correction` field
+(1 bit per value, lazily allocated); the memory/compression-ratio
+accounting includes it honestly (default mode is ~3.8× vs FP16, not 5.3×).
+
+**Tests**: `tests/attention_parity.rs`, `src/quantize.rs` round-trip tests.
+
+### Bug R7: `turboquant-cpu` claimed SIMD it never used
+
+The crate declared the `wide` SIMD crate (plus unused `bytemuck` and
+`tracing`) and advertised "rayon + SIMD". No SIMD code existed. The unused
+dependencies were removed and the docs now say rayon-only (scalar code is
+auto-vectorized by LLVM). Unused `serde_json`/`bytemuck` were likewise
+removed from `turboquant-core`.
+
+### Bug R8: Documentation/config dishonesty
+
+- `README.md`, `ci.yml`, `release.yml` referenced a nonexistent
+  `--features cpu` cargo feature (the CPU backend is a crate, not a
+  feature). Commands fixed to plain `--workspace` builds.
+- `README.md` claimed 5.3×/6× compression "including scale overhead";
+  the honest numbers are ~4.9× (no correction) and ~3.8× (default 1-bit
+  correction). Table replaced with measured numbers.
+- `pyproject.toml` declared the nonexistent build backend
+  `setuptools.backends._legacy:_Backend`; fixed to
+  `setuptools.build_meta`.
+- This file's Bug→Test mapping referenced test files that did not exist;
+  see the corrected table below.
+
+---
+
 ## Bug→Test Mapping
 
-| Bug # | Test File |
-|-------|-----------|
-| 1, 2 | `tests/bitpack_roundtrip.rs` |
-| 3 | `tests/kv_block_store_partial.rs` |
-| 4 | `tests/kv_block_retrieve_exact.rs` |
-| 5 | `tests/kv_block_create.rs` |
-| 6 | `tests/qjl_scale_optimality.rs` |
+Integration tests live in `rust/crates/turboquant-core/tests/`; unit
+tests live in `#[cfg(test)]` modules inside the listed source files.
+
+| Bug # | Test |
+|-------|------|
+| 1, 2 | `tests/bitpack_roundtrip.rs` (proptest round-trips) + `src/bitpack.rs` unit tests |
+| 3 | `tests/kv_block_roundtrip.rs` — `partial_range_stores_do_not_overlap` |
+| 4 | `tests/kv_block_roundtrip.rs` — `full_store_retrieve_roundtrip`, `multi_scale_per_position_roundtrip` |
+| 5 | `src/kv_block.rs` unit tests (`test_new_block_sizes`, `test_store_and_retrieve`) |
+| 6 | `src/qjl.rs` unit tests (`test_scale_adaptive`, `test_scale_fixed`); no dedicated optimality test yet |
 | 7 | `tests/attention_parity.rs` |
-| 8 | `tests/quantize_per_block.rs` |
-| 9 | `tests/rotation_convention.rs` |
-| 10 | `tests/compression_ratio_includes_overhead.rs` |
-| 11 | `benches/rotation_bench.rs` |
-| 12 | `tests/calibrate_yaml_output.rs` |
-| 13 | `benches/compression.rs` |
+| 8 | `src/qjl.rs` — `test_scale_percentile` (per-block percentile scaling) |
+| 9 | `src/rotation.rs` — `test_qr_orthogonality`, `test_qr_preserves_norm` |
+| 10 | `src/kv_block.rs` — `test_compression_ratio_includes_overhead` |
+| 11 | `turboquant-bench` crate (criterion; see that crate) |
+| 12 | calibration lives in `turboquant-cli`; see that crate's docs/tests |
+| 13 | `turboquant-bench` crate (criterion; see that crate) |
+| R1–R6 | listed per-bug above |

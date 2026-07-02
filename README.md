@@ -9,7 +9,9 @@
 [![Book](https://img.shields.io/badge/book-mdBook-purple.svg)](https://checkupauto.github.io/TurboQuant)
 
 A data-oblivious 3-bit compression algorithm that reduces KV cache memory
-footprint by **~6×** while maintaining near-zero quality loss (<0.1%).
+footprint by **~3.8–4.9×** (including scale/correction overhead) with a
+measured round-trip SNR of ~13–19 dB on Gaussian data, depending on the
+correction mode.
 
 > ⚡ **Now in Rust** — see `rust/` for the maintained implementation.
 > The Python prototype is preserved in `legacy/python/` for reference.
@@ -30,16 +32,17 @@ turboquant bench --head-dim 128 --seq-len 4096
 turboquant compress model.gguf -o model-turbo3.gguf
 ```
 
-## Actual Gains
+## Measured Gains
 
-| Scenario | Seq Len | FP16 (MB) | TurboQuant (MB) | Ratio | Quality |
-|----------|---------|-----------|-----------------|-------|---------|
-| Llama-3-8B (32 heads, 128 dim) | 4096 | 1024 | 192 | 5.3× | SNR > 12 dB |
-| Llama-3-8B (32 heads, 128 dim) | 8192 | 2048 | 384 | 5.3× | SNR > 12 dB |
-| Llama-3-8B (32 heads, 128 dim) | 16384 | 4096 | 768 | 5.3× | SNR > 12 dB |
-| Llama-3-8B (32 heads, 128 dim) | 32768 | 8192 | 1536 | 5.3× | SNR > 12 dB |
+| Mode | Bits/value | Ratio vs FP16 | Round-trip SNR (Gaussian) |
+|------|------------|---------------|---------------------------|
+| 3-bit, no correction | 3 + 0.25 (scales) | ~4.9× | ~13 dB |
+| 3-bit + 1-bit residual correction (default) | 4 + 0.25 (scales) | ~3.8× | ~19 dB |
 
-Ratios include per-block scale overhead (one f16 per 64 values).
+Ratios include per-block scale overhead (one f16 per 64 values) and, in
+the default mode, the persisted 1-bit correction signs. SNR numbers are
+measured by the test suite (`cargo test -p turboquant-core`) on
+standard-normal data with block size 64.
 
 ## Algorithm
 
@@ -103,10 +106,13 @@ rust/
 
 ```bash
 cd rust/
-cargo build --release --workspace --features=cpu
+cargo build --release --workspace
 cargo test --workspace
 cargo doc --workspace --no-deps --open
 ```
+
+(The CPU backend is the `turboquant-cpu` crate, built as part of the
+workspace — there is no `cpu` cargo feature.)
 
 ## License
 
