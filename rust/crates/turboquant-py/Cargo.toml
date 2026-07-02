@@ -16,4 +16,4 @@ turboquant-core = { path = "../turboquant-core" }
 pyo3.workspace = true
 numpy.workspace = true
 half.workspace = true
-
+ndarray.workspace = true

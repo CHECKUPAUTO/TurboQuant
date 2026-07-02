@@ -27,3 +27,6 @@ tracing-subscriber.workspace = true
 notify.workspace = true
 sd-notify.workspace = true
 
+
+[dev-dependencies]
+tempfile.workspace = true

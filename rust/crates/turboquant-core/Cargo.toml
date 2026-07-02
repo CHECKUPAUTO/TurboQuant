@@ -9,10 +9,8 @@ description = "Core TurboQuant algorithms: PolarRotation, QJL quantizer, bit-pac
 
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
-serde_json.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
-bytemuck.workspace = true
 ndarray = { workspace = true, features = ["serde"] }
 rand.workspace = true
 rand_distr.workspace = true
@@ -20,6 +18,4 @@ half = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]
 proptest.workspace = true
-tempfile.workspace = true
-criterion.workspace = true
 

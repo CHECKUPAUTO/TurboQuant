@@ -1,2 +1,0 @@
-window.ALL_CRATES = ["turboquant","turboquant_bench","turboquant_core","turboquant_cpu","turboquant_cuda","turboquant_daemon","turboquant_ffi","turboquant_gguf","turboquant_py"];
-//{"start":21,"fragment_lengths":[12,19,18,17,18,20,17,18,16]}

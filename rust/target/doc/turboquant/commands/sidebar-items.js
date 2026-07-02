@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"mod":["audit","bench","calibrate","compress","daemon","info","verify"]};

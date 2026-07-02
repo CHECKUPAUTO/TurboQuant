@@ -1,0 +1,15 @@
+[build-system]
+requires = ["maturin>=1.4,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "turboquant"
+description = "3-bit KV cache quantization (TurboQuant) Python bindings"
+requires-python = ">=3.8"
+license = { text = "MIT OR Apache-2.0" }
+dependencies = ["numpy"]
+dynamic = ["version"]
+
+[tool.maturin]
+module-name = "turboquant"
+manifest-path = "Cargo.toml"

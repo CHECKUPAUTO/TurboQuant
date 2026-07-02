@@ -22,7 +22,14 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         "CPU threads:".bold(),
         num_cpus::get().to_string().cyan()
     );
-    println!("  {} {}", "Backends:".bold(), "cpu".green());
+    // This build compiles in the CPU backend only. The CUDA backend is
+    // not implemented (turboquant-cuda is a stub).
+    println!(
+        "  {} {}, {}",
+        "Backends:".bold(),
+        "cpu (available)".green(),
+        "cuda (not implemented)".yellow()
+    );
 
     // OS info
     println!("  {} {}", "OS:".bold(), std::env::consts::OS.cyan());

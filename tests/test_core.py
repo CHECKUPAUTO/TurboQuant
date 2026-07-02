@@ -2,9 +2,9 @@
 Tests unitaires pour TurboQuant.
 
 Usage:
-    python -m pytest turboquant_test.py -v
+    python -m pytest tests/test_core.py -v
     # ou
-    python turboquant_test.py
+    python tests/test_core.py
 """
 
 import math
@@ -12,10 +12,7 @@ import unittest
 
 import torch
 
-# Import the fixed turboquant module
-import sys
-sys.path.insert(0, '/root')
-from turboquant_fixed import (
+from turboquant import (
     PolarQuant,
     QJLQuantizer,
     TurboQuantKVCache,
@@ -28,6 +25,7 @@ class TestPolarQuant(unittest.TestCase):
     """Tests for PolarQuant (Phase 1: Geometric Rotation)."""
 
     def setUp(self):
+        torch.manual_seed(0)
         self.dim = 128
         self.pq = PolarQuant(dim=self.dim)
 
@@ -70,6 +68,7 @@ class TestQJLQuantizer(unittest.TestCase):
     """Tests for QJLQuantizer (Phase 2: Johnson-Lindenstrauss Correction)."""
 
     def setUp(self):
+        torch.manual_seed(0)
         self.quant = QJLQuantizer(bits=3)
 
     def test_output_shape_preserved(self):
@@ -113,6 +112,7 @@ class TestTurboQuantKVCache(unittest.TestCase):
     """Integration tests for TurboQuantKVCache."""
 
     def setUp(self):
+        torch.manual_seed(0)
         self.cache = TurboQuantKVCache(
             num_layers=4,
             max_seq_len=512,
@@ -146,6 +146,7 @@ class TestTurboQuantAttention(unittest.TestCase):
     """Integration tests for TurboQuantAttention."""
 
     def setUp(self):
+        torch.manual_seed(0)
         self.attn = TurboQuantAttention(
             embed_dim=256,
             num_heads=8,
