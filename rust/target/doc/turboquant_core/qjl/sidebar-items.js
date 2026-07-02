@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["CorrectionMode","ScaleMode"],"struct":["CompressedBlock","QjlConfig","QjlQuantizer"]};

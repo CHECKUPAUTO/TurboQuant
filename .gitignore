@@ -36,3 +36,7 @@ Thumbs.db
 *.backup
 *.broken
 .pytest_cache/
+
+# Rust
+target/
+Cargo.lock.orig
