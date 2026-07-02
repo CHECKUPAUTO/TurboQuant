@@ -60,6 +60,23 @@ Pack: 8 values × 3 bits → 3 bytes
 Output: packed bytes + per-block scales + correction bits
 ```
 
+## Decompression APIs
+
+There are two decompression entry points, differing only in which domain
+the output lives in. `decompress_tensor` unpacks and dequantizes a
+`KvBlock` but does **not** undo the polar rotation — its output stays in
+the rotated domain, which is exactly what attention wants: Q and K share
+the same orthogonal rotation, so it cancels in Q·Kᵀ and un-rotating would
+be wasted work. `decompress_tensor_unrotated` performs the same
+dequantization and then applies the inverse rotation to each
+`head_dim`-sized row (mirroring how `compress_tensor` rotated each full
+row before block-wise quantization), returning caller-facing values in
+the original input domain; it fails with `InvalidDimension` if `head_dim`
+does not match the rotation's dimension. Round-trip SNR against the
+original input matches the rotated-domain figures above, since the
+rotation is orthogonal (see the `test_unrotated_roundtrip_*` tests in
+`turboquant-core/src/quantize.rs`).
+
 ## Compression Ratio
 
 ```
