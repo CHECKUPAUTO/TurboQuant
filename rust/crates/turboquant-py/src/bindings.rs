@@ -4,9 +4,6 @@
 //! `extension-module` feature the Python C API symbols stay unresolved,
 //! which is fine for the cdylib but would fail to link in a test binary.
 
-// The #[pyfunction]/#[pymethods] macros of pyo3 0.22 generate `.into()`
-// calls on already-PyErr values, which newer clippy flags.
-#![allow(clippy::useless_conversion)]
 // Doc comments here become Python __doc__ strings (help() output), so they
 // use Python docstring conventions, not rustdoc markdown.
 #![allow(clippy::doc_markdown)]
@@ -150,9 +147,9 @@ impl Quantizer {
         let slice = contiguous(&data, "data")?;
         let (packed, scale, correction) = self.inner.quantize(slice).map_err(value_error)?;
         Ok((
-            packed.into_pyarray_bound(py),
+            packed.into_pyarray(py),
             scale,
-            correction.map(|c| c.into_pyarray_bound(py)),
+            correction.map(|c| c.into_pyarray(py)),
         ))
     }
 
@@ -174,7 +171,7 @@ impl Quantizer {
         };
         self.inner
             .dequantize(packed_slice, n, scale, corr_slice)
-            .map(|values| values.into_pyarray_bound(py))
+            .map(|values| values.into_pyarray(py))
             .map_err(value_error)
     }
 }
@@ -188,7 +185,7 @@ fn pack_3bit<'py>(
 ) -> PyResult<Bound<'py, PyArray1<u8>>> {
     let slice = contiguous(&values, "values")?;
     logic::pack_3bit(slice)
-        .map(|packed| packed.into_pyarray_bound(py))
+        .map(|packed| packed.into_pyarray(py))
         .map_err(value_error)
 }
 
@@ -202,7 +199,7 @@ fn unpack_3bit<'py>(
 ) -> PyResult<Bound<'py, PyArray1<u8>>> {
     let slice = contiguous(&packed, "packed")?;
     logic::unpack_3bit(slice, n)
-        .map(|values| values.into_pyarray_bound(py))
+        .map(|values| values.into_pyarray(py))
         .map_err(value_error)
 }
 
@@ -218,7 +215,7 @@ fn hadamard_rotate<'py>(
 ) -> PyResult<Bound<'py, PyArray1<f32>>> {
     let slice = contiguous(&data, "data")?;
     logic::hadamard_rotate(slice, seed, inverse)
-        .map(|rotated| rotated.into_pyarray_bound(py))
+        .map(|rotated| rotated.into_pyarray(py))
         .map_err(value_error)
 }
 
