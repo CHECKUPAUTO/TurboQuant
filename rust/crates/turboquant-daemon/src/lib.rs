@@ -11,7 +11,8 @@
 //! `.gguf` model files (via `notify`), compresses them into an output
 //! directory using the same library path as the CLI
 //! (`turboquant_gguf::turbo`), serves a `GET /healthz` JSON endpoint,
-//! and shuts down gracefully on SIGTERM/ctrl-c.
+//! sends systemd readiness and watchdog keepalives (`sd_notify`), and
+//! shuts down gracefully on SIGTERM/ctrl-c.
 
 /// Daemon configuration.
 pub mod config;
