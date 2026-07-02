@@ -4,7 +4,7 @@
 
 [![Build](https://img.shields.io/badge/build-passing-brightgreen)]()
 [![Rust](https://img.shields.io/badge/rust-1.83+-orange.svg)](https://rust-lang.org)
-[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-PolyForm--NC%20%2B%20commercial-blue.svg)](LICENSING.md)
 [![MSRV](https://img.shields.io/badge/MSRV-1.83-red.svg)](https://blog.rust-lang.org/2024/11/28/Rust-1.83.0.html)
 [![Book](https://img.shields.io/badge/book-mdBook-purple.svg)](https://checkupauto.github.io/TurboQuant)
 
@@ -116,7 +116,13 @@ workspace — there is no `cpu` cargo feature.)
 
 ## License
 
-MIT OR Apache-2.0 — see [LICENSE](LICENSE) and [LICENSE-APACHE](LICENSE-APACHE).
+Double licence, alignée sur [SLHAv2](https://github.com/CHECKUPAUTO/SLHAv2) :
+**PolyForm Noncommercial 1.0.0** (usage non-commercial et personnel, gratuit) +
+**licence commerciale** requise pour tout usage commercial, offerte
+exclusivement pour l'usage de TurboQuant comme module **CCOS** — voir
+[LICENSING.md](LICENSING.md). TurboQuant et SLHAv2 sont des modules
+compagnons de CCOS. Les versions antérieures publiées sous MIT/Apache-2.0
+restent sous leurs termes d'origine.
 
 ## Author
 

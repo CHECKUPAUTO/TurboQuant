@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — 2026-07-02
 
+### Changed
+- The attached `LICENSE.md` carries the **canonical** PolyForm
+  Noncommercial 1.0.0 text (15 sections, from polyformproject.org) with the
+  Required Notice — not a paraphrase. The CCOS exclusivity applies to the
+  commercial offer; noncommercial use is standard, unrestricted PolyForm NC.
+- **License**: relicensed from MIT OR Apache-2.0 to a dual license —
+  PolyForm Noncommercial 1.0.0 (free for noncommercial use) plus a
+  commercial license offered exclusively for use as a CCOS module
+  (TurboQuant and SLHAv2 are companion modules of CCOS). Prior published
+  versions remain available under their original MIT OR Apache-2.0 terms.
+  See LICENSING.md
+
 ### Fixed
 - **QJL 3-bit grid collapse** (`turboquant-core`): the quantizer mapped
   values onto a mis-sized 15-level half-step grid (increment 0.5) and

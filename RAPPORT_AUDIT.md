@@ -109,7 +109,7 @@ Le package `TurboQuant` et le module `scirust_bridge` n'existent pas. Toute tent
 
 | Fichier | Rôle | Statut |
 |---------|------|--------|
-| `LICENSE` | Licence MIT (mentionnée dans README) | ✅ Créé |
+| `LICENSE` | Licence MIT (licence de l'époque, mentionnée dans le README d'alors ; remplacée depuis — voir LICENSING.md) | ✅ Créé |
 | `.gitignore` | Exclure `__pycache__`, `.pyc`, venv, etc. | ✅ Créé |
 | `requirements.txt` | Dépendances explicites | ✅ Créé |
 | `pyproject.toml` | Packaging moderne + metadata | ✅ Créé |
