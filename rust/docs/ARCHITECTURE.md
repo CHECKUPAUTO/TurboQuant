@@ -53,7 +53,9 @@ graph TD
 - Colored output
 
 ### turboquant-daemon
-- systemd `Type=notify` service (readiness via `sd_notify`)
+- systemd `Type=notify` service (readiness via `sd_notify`); honors the
+  unit watchdog (`WatchdogSec=`) by sending `WATCHDOG=1` keepalives at
+  half the configured interval when systemd arms one
 - Filesystem watcher (notify) that auto-compresses new `.gguf` files
 - Health endpoint `GET /healthz` on `127.0.0.1:7460` (default)
 - `tracing`-based logging; JSON config file

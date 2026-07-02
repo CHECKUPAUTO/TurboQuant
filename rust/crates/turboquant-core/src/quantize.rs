@@ -110,7 +110,10 @@ pub fn compress_tensor<R: Rotation>(
 ///
 /// Position `r` of the `KvBlock` maps to row `r` of the output, mirroring
 /// [`compress_tensor`]. The inverse rotation is **not** applied; the
-/// returned values live in the rotated domain.
+/// returned values live in the rotated domain. This is the right form for
+/// consumers that operate in the rotated domain (e.g. attention, where the
+/// shared orthogonal rotation cancels in Q·Kᵀ). Callers that need
+/// original-domain values should use [`decompress_tensor_unrotated`].
 ///
 /// # Errors
 ///
@@ -164,6 +167,70 @@ pub fn decompress_tensor(
                 result[[r, 0, start + j]] = *val;
             }
         }
+    }
+
+    Ok(result)
+}
+
+/// Decompress a `KvBlock` back to the **original** (un-rotated) domain.
+///
+/// Dequantizes exactly like [`decompress_tensor`], then applies `polar`'s
+/// inverse rotation to each full `head_dim`-sized row — mirroring
+/// [`compress_tensor`], which applies the forward rotation to each row as
+/// a whole before block-wise quantization. Output shape is
+/// (`num_heads`, 1, `head_dim`), with row `r` of the compressed input at
+/// position `r`, exactly like [`decompress_tensor`].
+///
+/// Use [`decompress_tensor`] when the consumer stays in the rotated
+/// domain; use this function when the caller needs values comparable to
+/// the tensor originally passed to [`compress_tensor`].
+///
+/// # Errors
+///
+/// Returns [`TurboQuantError::InvalidDimension`] if `head_dim` does not
+/// match the rotation dimension `polar.dim()`, plus any error
+/// [`decompress_tensor`] reports for invalid compressed data.
+///
+/// [`TurboQuantError::InvalidDimension`]: crate::error::TurboQuantError::InvalidDimension
+///
+/// # Examples
+///
+/// ```
+/// use ndarray::Array2;
+/// use turboquant_core::polar::PolarQuant;
+/// use turboquant_core::qjl::{QjlConfig, QjlQuantizer};
+/// use turboquant_core::quantize::{compress_tensor, decompress_tensor_unrotated};
+/// use turboquant_core::rotation::QrRotation;
+///
+/// let polar = PolarQuant::new(QrRotation::new(64, Some(42)));
+/// let quantizer = QjlQuantizer::new(QjlConfig::default());
+/// let tensor = Array2::from_shape_fn((4, 64), |(i, j)| ((i * 64 + j) as f32).sin());
+///
+/// let block = compress_tensor(&polar, &quantizer, &tensor.view()).unwrap();
+/// let restored = decompress_tensor_unrotated(&polar, &quantizer, &block, 4, 64).unwrap();
+/// assert_eq!(restored.shape(), &[4, 1, 64]);
+/// ```
+pub fn decompress_tensor_unrotated<R: Rotation>(
+    polar: &PolarQuant<R>,
+    quantizer: &QjlQuantizer,
+    kv_block: &KvBlock,
+    num_heads: usize,
+    head_dim: usize,
+) -> crate::Result<Array3<f32>> {
+    if polar.dim() != head_dim {
+        return Err(crate::error::TurboQuantError::InvalidDimension(format!(
+            "head_dim {head_dim} does not match rotation dim {}",
+            polar.dim()
+        )));
+    }
+
+    let mut result = decompress_tensor(quantizer, kv_block, num_heads, head_dim)?;
+
+    // Invert the rotation row-by-row, on the same (1, head_dim) row shape
+    // compress_tensor used when applying the forward rotation.
+    for r in 0..num_heads {
+        let mut row = result.slice_mut(ndarray::s![r, .., ..]);
+        polar.inverse(&mut row);
     }
 
     Ok(result)
@@ -365,7 +432,7 @@ pub fn turbo_attention_forward(
 mod tests {
     use super::*;
     use crate::qjl::{CorrectionMode, QjlConfig, ScaleMode};
-    use crate::rotation::QrRotation;
+    use crate::rotation::{FastHadamardRotation, HouseholderRotation, QrRotation};
     use ndarray::Array2;
     use rand::Rng;
     use rand_distr::StandardNormal;
@@ -445,6 +512,122 @@ mod tests {
                 "head {h} round-trip SNR too low ({snr:.2} dB) — position collision?"
             );
         }
+    }
+
+    /// Compress Gaussian data with the given rotation, decompress via
+    /// `decompress_tensor_unrotated`, and assert the round-trip SNR vs the
+    /// ORIGINAL (un-rotated) input clears 12 dB.
+    fn assert_unrotated_roundtrip<R: Rotation>(rot: R, label: &str) {
+        let num_rows = 8;
+        let head_dim = rot.dim();
+        let polar = PolarQuant::new(rot);
+        // Default config: block_size 64, 1-bit residual correction.
+        let quantizer = QjlQuantizer::new(QjlConfig::default());
+        let tensor = gaussian_matrix(num_rows, head_dim, 42);
+
+        let compressed = compress_tensor(&polar, &quantizer, &tensor.view()).unwrap();
+        let restored =
+            decompress_tensor_unrotated(&polar, &quantizer, &compressed, num_rows, head_dim)
+                .unwrap();
+        assert_eq!(restored.shape(), &[num_rows, 1, head_dim]);
+
+        let original: Vec<f32> = tensor.iter().copied().collect();
+        let restored_flat: Vec<f32> = restored.iter().copied().collect();
+        let snr = snr_db(&original, &restored_flat);
+        println!("{label}: unrotated round-trip SNR vs original = {snr:.2} dB");
+        assert!(
+            snr > 12.0,
+            "{label}: SNR vs original too low ({snr:.2} dB), inverse rotation missing or wrong?"
+        );
+    }
+
+    #[test]
+    fn test_unrotated_roundtrip_qr() {
+        assert_unrotated_roundtrip(QrRotation::new(64, Some(42)), "QrRotation");
+    }
+
+    #[test]
+    fn test_unrotated_roundtrip_householder() {
+        assert_unrotated_roundtrip(
+            HouseholderRotation::new(64, 16, Some(42)),
+            "HouseholderRotation",
+        );
+    }
+
+    #[test]
+    fn test_unrotated_roundtrip_hadamard() {
+        assert_unrotated_roundtrip(
+            FastHadamardRotation::new(64, Some(42)),
+            "FastHadamardRotation",
+        );
+    }
+
+    #[test]
+    fn test_decompress_tensor_stays_rotated() {
+        // Pins the semantic difference between the two decompression APIs:
+        // decompress_tensor returns ROTATED-domain values (far from the
+        // original), and only after the inverse rotation do they match the
+        // original — bit-for-bit the same as decompress_tensor_unrotated.
+        let num_rows = 8;
+        let head_dim = 64;
+        let polar = PolarQuant::new(QrRotation::new(head_dim, Some(21)));
+        let quantizer = QjlQuantizer::new(QjlConfig::default());
+        let tensor = gaussian_matrix(num_rows, head_dim, 21);
+
+        let compressed = compress_tensor(&polar, &quantizer, &tensor.view()).unwrap();
+        let rotated = decompress_tensor(&quantizer, &compressed, num_rows, head_dim).unwrap();
+
+        let original: Vec<f32> = tensor.iter().copied().collect();
+        let rotated_flat: Vec<f32> = rotated.iter().copied().collect();
+        let snr_rotated = snr_db(&original, &rotated_flat);
+        println!("rotated-domain output vs original: {snr_rotated:.2} dB");
+        assert!(
+            snr_rotated < 6.0,
+            "decompress_tensor output should differ from the original \
+             (rotated domain), but SNR is {snr_rotated:.2} dB"
+        );
+
+        // Manual inverse rotation, row by row, recovers the original...
+        let mut manual = rotated.clone();
+        for r in 0..num_rows {
+            let mut row = manual.slice_mut(ndarray::s![r, .., ..]);
+            polar.inverse(&mut row);
+        }
+        let manual_flat: Vec<f32> = manual.iter().copied().collect();
+        let snr_manual = snr_db(&original, &manual_flat);
+        println!("manually un-rotated output vs original: {snr_manual:.2} dB");
+        assert!(
+            snr_manual > 12.0,
+            "manual inverse rotation SNR too low: {snr_manual:.2} dB"
+        );
+
+        // ...and agrees with decompress_tensor_unrotated.
+        let unrotated =
+            decompress_tensor_unrotated(&polar, &quantizer, &compressed, num_rows, head_dim)
+                .unwrap();
+        for (m, u) in manual.iter().zip(unrotated.iter()) {
+            assert!(
+                (m - u).abs() < 1e-5,
+                "manual inverse ({m}) disagrees with decompress_tensor_unrotated ({u})"
+            );
+        }
+    }
+
+    #[test]
+    fn test_unrotated_rejects_rotation_dim_mismatch() {
+        let head_dim = 64;
+        let polar = PolarQuant::new(QrRotation::new(head_dim, Some(5)));
+        let quantizer = QjlQuantizer::new(QjlConfig::default());
+        let tensor = gaussian_matrix(2, head_dim, 5);
+        let compressed = compress_tensor(&polar, &quantizer, &tensor.view()).unwrap();
+
+        let wrong_polar = PolarQuant::new(QrRotation::new(32, Some(5)));
+        let err = decompress_tensor_unrotated(&wrong_polar, &quantizer, &compressed, 2, head_dim)
+            .unwrap_err();
+        assert!(
+            matches!(err, crate::error::TurboQuantError::InvalidDimension(_)),
+            "expected InvalidDimension, got {err:?}"
+        );
     }
 
     #[test]

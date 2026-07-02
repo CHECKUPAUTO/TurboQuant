@@ -1,5 +1,5 @@
 //! Daemon runtime: filesystem watcher, compression, health endpoint,
-//! and graceful shutdown.
+//! systemd watchdog keepalives, and graceful shutdown.
 
 use crate::config::DaemonConfig;
 use axum::extract::State;
@@ -16,6 +16,46 @@ use turboquant_gguf::turbo::{self, TurboOptions};
 use turboquant_gguf::GgufParser;
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
+
+/// Floor for the watchdog keepalive interval, guarding against an
+/// absurdly small `WATCHDOG_USEC` producing a busy ping loop.
+const MIN_WATCHDOG_PING: Duration = Duration::from_secs(1);
+
+/// Derive the keepalive ping interval from systemd's `WATCHDOG_USEC`
+/// value: half the watchdog timeout (so a missed tick still leaves one
+/// more chance before systemd fires), clamped to [`MIN_WATCHDOG_PING`].
+fn watchdog_ping_interval(watchdog_usec: u64) -> Duration {
+    Duration::from_micros(watchdog_usec / 2).max(MIN_WATCHDOG_PING)
+}
+
+/// Parse systemd watchdog configuration as passed via the environment
+/// (`sd_watchdog_enabled(3)` semantics). Returns the keepalive interval
+/// if a watchdog is armed for this process:
+///
+/// - `usec` (`WATCHDOG_USEC`) must be a positive integer.
+/// - `pid` (`WATCHDOG_PID`), when set, must equal `own_pid`; otherwise
+///   the watchdog is meant for another process and we must not ping.
+fn watchdog_interval(usec: Option<&str>, pid: Option<&str>, own_pid: u32) -> Option<Duration> {
+    let usec: u64 = usec?.parse().ok()?;
+    if usec == 0 {
+        return None;
+    }
+    if let Some(pid) = pid {
+        if pid.parse::<u32>().ok()? != own_pid {
+            return None;
+        }
+    }
+    Some(watchdog_ping_interval(usec))
+}
+
+/// Read the watchdog configuration from the process environment.
+fn watchdog_interval_from_env() -> Option<Duration> {
+    watchdog_interval(
+        std::env::var("WATCHDOG_USEC").ok().as_deref(),
+        std::env::var("WATCHDOG_PID").ok().as_deref(),
+        std::process::id(),
+    )
+}
 
 /// Shared daemon state, exposed via the `/healthz` endpoint.
 #[derive(Debug, Default)]
@@ -140,10 +180,27 @@ pub async fn run(config: DaemonConfig) -> Result<(), BoxError> {
         warn!("no watch directories exist; only the health endpoint is active");
     }
 
-    // Tell systemd we are ready (no-op outside systemd).
-    if let Err(e) = sd_notify::notify(true, &[sd_notify::NotifyState::Ready]) {
+    // Tell systemd we are ready (no-op outside systemd). Keep
+    // NOTIFY_SOCKET set (unset_env = false): the watchdog task below
+    // sends keepalives over the same socket.
+    if let Err(e) = sd_notify::notify(false, &[sd_notify::NotifyState::Ready]) {
         debug!("sd_notify failed (not running under systemd?): {e}");
     }
+
+    // systemd watchdog keepalives. Only spawned when systemd armed a
+    // watchdog for this process; normal runs pay zero overhead.
+    let watchdog = watchdog_interval_from_env().map(|interval| {
+        debug!("systemd watchdog enabled, pinging every {interval:?}");
+        tokio::spawn(async move {
+            let mut ticker = tokio::time::interval(interval);
+            loop {
+                ticker.tick().await;
+                if let Err(e) = sd_notify::notify(false, &[sd_notify::NotifyState::Watchdog]) {
+                    warn!("watchdog keepalive failed: {e}");
+                }
+            }
+        })
+    });
 
     // HTTP server with graceful shutdown.
     let (http_shutdown_tx, http_shutdown_rx) = tokio::sync::oneshot::channel::<()>();
@@ -209,7 +266,10 @@ pub async fn run(config: DaemonConfig) -> Result<(), BoxError> {
         }
     }
 
-    // Stop the watcher and drain the HTTP server.
+    // Stop the keepalives and the watcher, then drain the HTTP server.
+    if let Some(task) = watchdog {
+        task.abort();
+    }
     drop(watcher);
     let _ = http_shutdown_tx.send(());
     match server.await {
@@ -297,6 +357,42 @@ mod tests {
             compress_once(&output, &out_dir, 64).unwrap(),
             CompressOutcome::AlreadyCompressed
         );
+    }
+
+    #[test]
+    fn watchdog_ping_interval_halves_and_clamps() {
+        // WatchdogSec=60 -> ping every 30s.
+        assert_eq!(watchdog_ping_interval(60_000_000), Duration::from_secs(30));
+        // 4s -> 2s (the smoke-test configuration).
+        assert_eq!(watchdog_ping_interval(4_000_000), Duration::from_secs(2));
+        // Tiny or zero values clamp to the 1s floor instead of busy-looping.
+        assert_eq!(watchdog_ping_interval(100_000), MIN_WATCHDOG_PING);
+        assert_eq!(watchdog_ping_interval(0), MIN_WATCHDOG_PING);
+        // Exactly 2s -> exactly the floor.
+        assert_eq!(watchdog_ping_interval(2_000_000), MIN_WATCHDOG_PING);
+    }
+
+    #[test]
+    fn watchdog_interval_parses_environment_values() {
+        let pid = 4242;
+        // Enabled: usec set, no pid restriction.
+        assert_eq!(
+            watchdog_interval(Some("60000000"), None, pid),
+            Some(Duration::from_secs(30))
+        );
+        // Enabled: pid restriction matches us.
+        assert_eq!(
+            watchdog_interval(Some("4000000"), Some("4242"), pid),
+            Some(Duration::from_secs(2))
+        );
+        // Disabled: watchdog armed for a different process.
+        assert_eq!(watchdog_interval(Some("4000000"), Some("1"), pid), None);
+        // Disabled: unset, zero, or garbage usec; garbage pid.
+        assert_eq!(watchdog_interval(None, None, pid), None);
+        assert_eq!(watchdog_interval(Some("0"), None, pid), None);
+        assert_eq!(watchdog_interval(Some("soon"), None, pid), None);
+        assert_eq!(watchdog_interval(Some("-1"), None, pid), None);
+        assert_eq!(watchdog_interval(Some("4000000"), Some("pid"), pid), None);
     }
 
     #[test]
