@@ -8,13 +8,16 @@ repository.workspace = true
 description = "C FFI bindings for TurboQuant"
 
 [lib]
-crate-type = ["cdylib", "staticlib"]
+# rlib is included so Rust integration tests can link against the crate;
+# the shipped artifacts are the cdylib and staticlib.
+crate-type = ["cdylib", "staticlib", "rlib"]
 
 [build-dependencies]
 cbindgen.workspace = true
 
 [dependencies]
 turboquant-core = { path = "../turboquant-core" }
-libc.workspace = true
-bytemuck.workspace = true
+half.workspace = true
 
+[dev-dependencies]
+tempfile.workspace = true
