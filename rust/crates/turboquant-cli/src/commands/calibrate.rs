@@ -13,14 +13,16 @@ pub fn run(data_path: String, output: String) -> Result<(), Box<dyn std::error::
     println!("  Output: {}", output.cyan());
 
     // Generate calibration params
-    use turboquant_core::qjl::{CorrectionMode, QjlConfig, QjlQuantizer, ScaleMode};
+    use turboquant_core::qjl::{
+        CorrectionMode, QjlConfig, QjlQuantizer, ScaleMode, DEFAULT_CORRECTION_SCALE,
+    };
 
     let config = QjlConfig {
         bits: 3,
         block_size: 64,
         scale_mode: ScaleMode::Adaptive,
         correction: CorrectionMode::OneBitResidual {
-            learned_scale: 0.01,
+            learned_scale: DEFAULT_CORRECTION_SCALE,
         },
     };
 
@@ -36,9 +38,10 @@ block_size: {}
 scale_mode: Adaptive
 correction:
   type: OneBitResidual
-  learned_scale: 0.01
+  # MSE-optimal quarter step (0.25 / 3.5), relative to the block scale
+  learned_scale: {}
 ",
-        config.bits, config.block_size
+        config.bits, config.block_size, DEFAULT_CORRECTION_SCALE
     );
 
     std::fs::write(&output, yaml)?;

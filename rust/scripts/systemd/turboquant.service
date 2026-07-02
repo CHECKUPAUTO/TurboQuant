@@ -11,7 +11,8 @@ Group=turboquant
 ExecStart=/usr/local/bin/turboquant daemon
 Restart=on-failure
 RestartSec=5
-WatchdogSec=60
+# No WatchdogSec: the daemon notifies READY=1 but does not send
+# WATCHDOG=1 keepalives yet - a watchdog here would kill it every cycle.
 
 # Security hardening
 ProtectSystem=strict

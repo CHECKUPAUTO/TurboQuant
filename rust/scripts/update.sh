@@ -50,7 +50,7 @@ fi
 
 # Rebuild
 source "$HOME/.cargo/env"
-cargo build --release --workspace --features=cpu
+cargo build --release --workspace
 
 # Atomically replace
 cp target/release/turboquant /usr/local/bin/turboquant.new

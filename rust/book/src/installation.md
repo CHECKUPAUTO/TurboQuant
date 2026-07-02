@@ -11,7 +11,7 @@ curl -fsSL https://raw.githubusercontent.com/CHECKUPAUTO/TurboQuant/main/rust/sc
 ```bash
 git clone https://github.com/CHECKUPAUTO/TurboQuant
 cd TurboQuant/rust
-cargo build --release --workspace --features=cpu
+cargo build --release --workspace
 sudo cp target/release/turboquant /usr/local/bin/
 ```
 
@@ -19,4 +19,6 @@ sudo cp target/release/turboquant /usr/local/bin/
 
 - Rust 1.83+
 - Linux x86_64 (Debian 12+, Ubuntu 22.04+, Fedora 40+, Arch)
-- Optional: CUDA 11.4+ for GPU acceleration
+
+There is no GPU backend yet — everything runs on the CPU
+(`turboquant-cuda` is a placeholder crate).

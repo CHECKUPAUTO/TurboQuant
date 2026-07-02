@@ -31,38 +31,43 @@ graph TD
 - `error.rs` — Unified error type
 
 ### turboquant-cpu
-- Parallel compression via rayon
-- SIMD acceleration via `wide` crate
+- Parallel compression via rayon (no explicit SIMD; scalar code is
+  auto-vectorized by LLVM)
 - Benchmark helper functions
 
 ### turboquant-cuda
-- Feature-gated (`cuda` feature)
-- CUDA kernels via `cudarc`
-- GPU rotation, quantization, attention
+- Placeholder crate — **no GPU code is implemented**
+- Reserves the API surface behind the (feature-gated, `cuda`) `cudarc`
+  dependency for a future backend
 
 ### turboquant-gguf
-- GGUF format parsing
-- Writer with `cache-type: turbo3` metadata
-- Integration point for llama.cpp
+- GGUF v2/v3 parsing, v3 writing
+- "turbo3" compressed-model format v1 via `turboquant.*` metadata keys
+  (see [GGUF.md](GGUF.md))
+- Intended integration point for llama.cpp (which would need to
+  implement the turbo3 spec to read compressed tensors)
 
 ### turboquant-cli
 - CLI with clap derive
-- 7 subcommands
-- Progress bars, colored output
+- 7 subcommands: compress, verify, bench, calibrate, audit, info, daemon
+- Colored output
 
 ### turboquant-daemon
-- systemd watchdog service
-- Filesystem watcher (notify)
-- HTTP API on `127.0.0.1:7460`
-- Structured JSON logging
+- systemd `Type=notify` service (readiness via `sd_notify`)
+- Filesystem watcher (notify) that auto-compresses new `.gguf` files
+- Health endpoint `GET /healthz` on `127.0.0.1:7460` (default)
+- `tracing`-based logging; JSON config file
 
 ### turboquant-ffi
 - C ABI via `cbindgen`
-- Functions: `tq_compress`, `tq_decompress`, `tq_attention_forward`
+- Functions: `tq_quantizer_create`/`tq_quantizer_destroy`,
+  `tq_quantize`, `tq_dequantize`, plus buffer-sizing helpers
+  (see [FFI.md](FFI.md))
 
 ### turboquant-py
-- Python bindings via pyo3
-- Drop-in compatibility with `legacy/python/turboquant.py`
+- Python bindings via pyo3 (module name `turboquant`, built with maturin)
+- Exposes `Quantizer`, `pack_3bit`/`unpack_3bit`, `hadamard_rotate`
+  (see [FFI.md](FFI.md))
 
 ### turboquant-bench
 - Criterion benchmarks
@@ -70,8 +75,8 @@ graph TD
 
 ## Extension Points
 
-All core algorithms expose traits for custom implementations:
-
-- `Rotation` — implement new orthogonal transforms
-- Custom `ScaleMode` — override scale computation
-- `Backend` — target new hardware (Metal, ROCm, WebGPU)
+- `Rotation` (trait) — implement new orthogonal transforms
+- `ScaleMode` (enum) — absmax, percentile, adaptive, fixed; new modes are
+  added as variants in `turboquant-core`
+- New hardware backends (CUDA, Metal, ROCm, WebGPU) would slot in as
+  sibling crates over `turboquant-core`; there is no `Backend` trait yet

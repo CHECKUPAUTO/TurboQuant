@@ -1,42 +1,58 @@
 # Benchmarks
 
-## Target Hardware
+## How to measure
 
-- CPU: Dell PowerEdge T430 (2× Xeon E5-2630 v4, 20 cores)
-- GPU: NVIDIA RTX 4060 (8 GB VRAM)
+Numbers depend on your hardware — measure locally:
 
-## Compression Throughput
+```bash
+# End-to-end compression benchmark (CPU backend)
+turboquant bench --head-dim 128 --seq-len 4096 --num-heads 32
 
-| head_dim | Tensor Size | Throughput (GB/s) |
-|----------|-------------|-------------------|
-| 64 | 64 × 8 heads | 12.4 |
-| 128 | 128 × 8 heads | 11.8 |
-| 256 | 256 × 8 heads | 10.2 |
+# Criterion micro-benchmarks (compression, rotation, attention)
+cargo bench -p turboquant-bench
+# then open target/criterion/report/index.html
+```
 
-## Memory Savings (seq_len=4096, 32 heads, 32 layers)
+## Compression Ratio (measured)
 
-| head_dim | FP16 (MB) | TurboQuant (MB) | Ratio |
-|----------|-----------|-----------------|-------|
-| 64 | 512 | 98 | 5.2× |
-| 128 | 1024 | 193 | 5.3× |
-| 256 | 2048 | 385 | 5.3× |
+Ratios vs FP16 include the per-block f16 scale (one per 64 values by
+default) and, in the default mode, the persisted 1-bit correction signs:
 
-## Attention Quality
+| Mode | Bits/value | Ratio vs FP16 |
+|------|------------|---------------|
+| 3-bit, no correction | 3 + 16/64 = 3.25 | ~4.9× |
+| 3-bit + 1-bit residual correction (default) | 4 + 16/64 = 4.25 | ~3.8× |
 
-| Scenario | SNR (dB) | Cosine Similarity |
-|----------|----------|-------------------|
-| Random vectors (d=64) | 14.2 | 0.98 |
-| Random vectors (d=128) | 13.8 | 0.97 |
-| Extracted activations | 12.5 | 0.96 |
+`turboquant bench` reports the same ~3.8× for the default configuration.
 
-Target: SNR > 12 dB, cosine > 0.96 ✅
+## Quality (measured by the test suite)
 
-## Rotation Comparison
+Round-trip SNR on standard-normal data, block size 64
+(`cargo test -p turboquant-core`):
 
-| Method | Init (μs) | Apply/vec (ns) | Memory (KB) |
-|--------|-----------|----------------|-------------|
-| QR (d=128) | 1450 | 2100 | 64 |
-| Householder (k=16) | 85 | 420 | 8 |
-| Hadamard (d=128) | 12 | 98 | 0.5 |
+| Scenario | SNR (dB) |
+|----------|----------|
+| 3-bit grid only (no correction) | ~13 |
+| 3-bit + default 1-bit correction | ~19 |
 
-See `target/criterion/report/index.html` for full interactive reports.
+End-to-end attention parity (compressed K/V vs float reference,
+`tests/attention_parity.rs`) asserts **SNR > 12 dB** and
+**cosine similarity > 0.96**; the statistics are computed from the actual
+tensors, not hardcoded.
+
+## Throughput
+
+Compression throughput is hardware-dependent and no reference numbers
+are published yet — run `turboquant bench` or the criterion suite above
+on your target machine. The CPU backend parallelizes over heads with
+rayon; there is no hand-written SIMD (scalar code is auto-vectorized).
+
+## Rotation Strategies (asymptotics)
+
+| Method | Init | Apply/vec | Memory |
+|--------|------|-----------|--------|
+| QR (d×d matrix) | O(d³) | O(d²) | O(d²) |
+| Householder (k reflectors) | O(k·d) | O(k·d) | O(k·d) |
+| Hadamard | O(d) | O(d log d) | O(d) |
+
+Relative wall-clock costs are measured by `cargo bench -p turboquant-bench`.

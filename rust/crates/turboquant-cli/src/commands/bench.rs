@@ -30,38 +30,44 @@ pub fn run(
 
     println!("{}", "Results:".bold().green());
     println!(
-        "  FP16 memory (K+V):     {:>8.2} MB",
-        results.fp16_total_mb.to_string().yellow()
+        "  FP16 memory (K+V):     {} MB",
+        format!("{:>8.2}", results.fp16_total_mb).yellow()
     );
     println!(
-        "  TurboQuant K cache:    {:>8.2} MB",
-        results.compressed_k_mb.to_string().yellow()
+        "  TurboQuant K cache:    {} MB",
+        format!("{:>8.2}", results.compressed_k_mb).yellow()
     );
     println!(
-        "  TurboQuant V cache:    {:>8.2} MB",
-        results.compressed_v_mb.to_string().yellow()
+        "  TurboQuant V cache:    {} MB",
+        format!("{:>8.2}", results.compressed_v_mb).yellow()
     );
     println!(
-        "  Compression ratio:     {:>8.2}x",
-        results.compression_ratio.to_string().bright_green().bold()
+        "  Compression ratio:     {}x",
+        format!("{:>8.2}", results.compression_ratio)
+            .bright_green()
+            .bold()
     );
     println!(
-        "  Throughput:            {:>8.2} GB/s",
-        results.compression_throughput_gbps.to_string().yellow()
+        "  Throughput:            {} GB/s",
+        format!("{:>8.2}", results.compression_throughput_gbps).yellow()
     );
     println!(
-        "  Elapsed:               {:>8.2} ms",
-        results.elapsed_ms.to_string().yellow()
+        "  Elapsed:               {} ms",
+        format!("{:>8.2}", results.elapsed_ms).yellow()
     );
 
-    if results.compression_ratio >= 5.0 {
+    // Theoretical ratio for 3-bit + 1-bit correction + per-block f16 scales
+    // is 16 / 4.25 ≈ 3.76× (≈ 4.9× without correction) — flag only genuine
+    // shortfalls against that, not against the correction-free ceiling.
+    const TARGET_RATIO: f64 = 3.7;
+    if results.compression_ratio >= TARGET_RATIO {
         println!(
-            "\n{} Target compression ratio achieved (≥ 5.0×)",
+            "\n{} Compression ratio matches the 3-bit + correction format (≥ {TARGET_RATIO}×)",
             "✓".green().bold()
         );
     } else {
         println!(
-            "\n{} Compression ratio below target ({} < 5.0×)",
+            "\n{} Compression ratio below the format's theoretical {TARGET_RATIO}× ({})",
             "⚠".yellow().bold(),
             format!("{:.1}", results.compression_ratio).yellow()
         );

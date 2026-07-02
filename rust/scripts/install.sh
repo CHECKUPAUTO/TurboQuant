@@ -123,16 +123,17 @@ detect_cuda() {
 }
 
 build_turboquant() {
-    local features="cpu"
+    # The CPU backend is a regular workspace crate — there is no `cpu`
+    # cargo feature. The CUDA backend is not implemented yet, so nothing
+    # extra is built even when CUDA is detected.
     if [ "$WITH_CUDA" = "yes" ]; then
-        features="$features,cuda"
+        log "CUDA detected, but the CUDA backend is not implemented yet — building CPU-only"
     fi
-    log "Building with features: $features"
     if [ "$DRY_RUN" = "yes" ]; then
-        log "[DRY RUN] cargo build --release --workspace --features=$features"
+        log "[DRY RUN] cargo build --release --workspace"
     else
         source "$HOME/.cargo/env"
-        cargo build --release --workspace --features="$features"
+        cargo build --release --workspace
     fi
 }
 
