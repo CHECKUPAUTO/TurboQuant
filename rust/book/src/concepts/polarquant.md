@@ -5,7 +5,7 @@ information uniformly before quantization.
 
 ## Mathematics
 
-```
+```text
 y = x · R    where Rᵀ · R = I
 ```
 

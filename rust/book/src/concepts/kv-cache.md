@@ -6,7 +6,7 @@ K and V tensors for all previous tokens.
 
 ## Memory Footprint
 
-```
+```text
 KV_memory = 2 × num_layers × seq_len × num_heads × head_dim × 2 bytes
 ```
 

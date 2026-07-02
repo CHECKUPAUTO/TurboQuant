@@ -95,5 +95,9 @@ jobs:
       - uses: peaceiris/actions-mdbook@v2
         with:
           mdbook-version: '0.4.44'
+      - uses: dtolnay/rust-toolchain@stable
+      # The book's Rust examples are compiled against the real crate:
+      # build it once and point mdbook test at the rlibs.
+      - run: cargo build -p turboquant-core --manifest-path rust/Cargo.toml
       - run: mdbook build rust/book
-      - run: mdbook test rust/book
+      - run: mdbook test rust/book -L rust/target/debug/deps
