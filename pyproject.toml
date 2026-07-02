@@ -7,7 +7,7 @@ name = "turboquant"
 version = "0.1.0"
 description = "3-bit KV Cache Compression for LLM inference"
 readme = "README.md"
-license = {text = "MIT"}
+license = {text = "PolyForm-Noncommercial-1.0.0"}
 requires-python = ">=3.10"
 dependencies = [
     "torch>=2.0.0",

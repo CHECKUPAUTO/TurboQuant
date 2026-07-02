@@ -6,7 +6,7 @@ build-backend = "maturin"
 name = "turboquant"
 description = "3-bit KV cache quantization (TurboQuant) Python bindings"
 requires-python = ">=3.8"
-license = { text = "MIT OR Apache-2.0" }
+license = { text = "PolyForm-Noncommercial-1.0.0" }
 dependencies = ["numpy"]
 dynamic = ["version"]
 

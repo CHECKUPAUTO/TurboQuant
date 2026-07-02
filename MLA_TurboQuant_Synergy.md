@@ -343,4 +343,5 @@ Expected improvements on 7B model with 16K context:
 
 ## License
 
-MIT License - CHECKUPAUTO
+PolyForm Noncommercial 1.0.0 + licence commerciale (usage CCOS exclusivement) —
+voir LICENSING.md. CHECKUPAUTO
