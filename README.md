@@ -90,10 +90,10 @@ rust/
 ## Documentation
 
 - **[mdBook](https://checkupauto.github.io/TurboQuant)** — full user guide
-- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — internal design
-- **[docs/ALGORITHM.md](docs/ALGORITHM.md)** — mathematical derivation
-- **[docs/USAGE.md](docs/USAGE.md)** — recipes for llama.cpp, Ollama, C/FFI
-- **[docs/MIGRATION_FROM_PYTHON.md](docs/MIGRATION_FROM_PYTHON.md)** — porting guide
+- **[docs/ARCHITECTURE.md](rust/docs/ARCHITECTURE.md)** — internal design
+- **[docs/ALGORITHM.md](rust/docs/ALGORITHM.md)** — mathematical derivation
+- **[docs/USAGE.md](rust/docs/USAGE.md)** — recipes for llama.cpp, Ollama, C/FFI
+- **[docs/MIGRATION_FROM_PYTHON.md](rust/docs/MIGRATION_FROM_PYTHON.md)** — porting guide
 
 ## Requirements
 

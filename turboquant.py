@@ -102,14 +102,15 @@ class QJLQuantizer(nn.Module):
         self.bits = bits
         self.levels = 2 ** bits  # 8 levels for 3 bits
 
-        # QJL correction scale, in level units (the grid steps by
-        # `increment` = 0.5, so the rounding residual is uniform in
-        # [-0.25, 0.25] and the MSE-optimal fixed correction is its mean
-        # magnitude: increment / 4 = 0.125).
+        # QJL correction scale, in level units. The 8-level grid steps by
+        # 1.0, so the rounding residual is uniform in [-0.5, 0.5] and the
+        # MSE-optimal fixed correction is its mean magnitude: a quarter
+        # step = 0.25 (the Rust core's DEFAULT_CORRECTION_SCALE, which is
+        # expressed as 0.25/3.5 in its normalized units).
         if learn_scale:
-            self.scale = nn.Parameter(torch.tensor(0.125))
+            self.scale = nn.Parameter(torch.tensor(0.25))
         else:
-            self.register_buffer('scale', torch.tensor(0.125))
+            self.register_buffer('scale', torch.tensor(0.25))
 
     def quantize(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -124,18 +125,15 @@ class QJLQuantizer(nn.Module):
         # Find dynamic range
         x_max = x.abs().max() + 1e-8
 
-        # Scale to quantization range
-        # For 3 bits: range is [-3.5, 3.5] in 0.5 increments
-        # This gives 15 half-increments (7 positive, 7 negative, zero)
+        # Scale to quantization range: [-3.5, 3.5] for 3 bits.
         half_range = (self.levels - 1) / 2  # 3.5 for 8 levels
         x_scaled = (x / x_max) * half_range
 
-        # Quantize to nearest level (0.5 increments for 3-bit)
-        increment = 1.0 / (self.levels // 2)  # 0.5 for 3-bit
-        x_quant = torch.round(x_scaled / increment) * increment
-
-        # Clip to valid range
-        x_quant = torch.clamp(x_quant, -half_range, half_range)
+        # Quantize to the 8-level symmetric grid {±0.5, ±1.5, ±2.5, ±3.5}
+        # (levels spaced 1.0 apart, no zero level) — the same grid as the
+        # Rust core: idx = clamp(round(x + 3.5), 0, 7), level = idx − 3.5.
+        idx = torch.clamp(torch.round(x_scaled + half_range), 0, self.levels - 1)
+        x_quant = idx - half_range
 
         # QJL 1-bit correction on residual. x_quant and the residual are
         # both in level units ([-half_range, half_range]) and dequantize()
