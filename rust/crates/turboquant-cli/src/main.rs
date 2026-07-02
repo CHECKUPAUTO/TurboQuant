@@ -35,7 +35,7 @@ pub struct Cli {
     #[arg(short = 'j', long = "threads", global = true)]
     pub threads: Option<usize>,
 
-    /// Backend to use: cpu, cuda, or auto
+    /// Backend to use: cpu or auto (cuda is not implemented yet)
     #[arg(long = "backend", default_value = "auto", global = true)]
     pub backend: String,
 
@@ -52,7 +52,7 @@ pub enum Commands {
     /// Examples:
     ///   turboquant compress model.gguf -o model-turbo3.gguf
     ///   turboquant compress ~/.ollama/models/blobs/sha256-* --in-place --bits 3
-    ///   turboquant compress *.gguf --backend cuda --block-size 128
+    ///   turboquant compress *.gguf --block-size 128
     Compress {
         /// Input GGUF file(s) to compress
         #[arg(value_hint = ValueHint::FilePath)]
@@ -79,11 +79,16 @@ pub enum Commands {
         scale_mode: String,
     },
 
-    /// Verify a compressed GGUF is readable and conformant
+    /// Verify a compressed GGUF: decompress every tensor and report
+    /// per-tensor SNR/MSE when the original file is provided
     Verify {
         /// GGUF file to verify
         #[arg(value_hint = ValueHint::FilePath)]
         file: String,
+
+        /// Original (uncompressed) GGUF to compare against for SNR/MSE
+        #[arg(long = "original", value_hint = ValueHint::FilePath)]
+        original: Option<String>,
     },
 
     /// Benchmark compression/decompression vs FP16
@@ -187,7 +192,24 @@ fn main() {
         )
         .init();
 
-    let result = match cli.command {
+    let result = match cli.backend.as_str() {
+        "cpu" | "auto" => run_command(cli.command),
+        "cuda" => Err(
+            "CUDA backend not implemented (this build has no GPU support; use --backend cpu)"
+                .into(),
+        ),
+        other => Err(format!("unknown backend '{other}' (expected: cpu, auto)").into()),
+    };
+
+    if let Err(e) = result {
+        eprintln!("{} {}", "error:".red().bold(), e);
+        std::process::exit(1);
+    }
+}
+
+/// Dispatch a parsed subcommand.
+fn run_command(command: Commands) -> Result<(), Box<dyn std::error::Error>> {
+    match command {
         Commands::Compress {
             files,
             output,
@@ -196,7 +218,7 @@ fn main() {
             block_size,
             scale_mode,
         } => commands::compress::run(files, output, in_place, bits, block_size, scale_mode),
-        Commands::Verify { file } => commands::verify::run(file),
+        Commands::Verify { file, original } => commands::verify::run(file, original),
         Commands::Bench {
             head_dim,
             seq_len,
@@ -207,10 +229,5 @@ fn main() {
         Commands::Audit { path } => commands::audit::run(path),
         Commands::Info => commands::info::run(),
         Commands::Daemon { config } => commands::daemon::run(config),
-    };
-
-    if let Err(e) = result {
-        eprintln!("{} {}", "error:".red().bold(), e);
-        std::process::exit(1);
     }
 }

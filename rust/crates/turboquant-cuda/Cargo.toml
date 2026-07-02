@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "CUDA backend for TurboQuant (feature-gated via cudarc)"
+description = "CUDA backend placeholder for TurboQuant (NOT implemented; no GPU code)"
 
 [features]
 default = []

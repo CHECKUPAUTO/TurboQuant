@@ -10,6 +10,7 @@ description = "GGUF I/O for TurboQuant: parsing, writing, cache-type turbo3 supp
 [dependencies]
 turboquant-core = { path = "../turboquant-core" }
 byteorder.workspace = true
+half.workspace = true
 memmap2.workspace = true
 serde.workspace = true
 thiserror.workspace = true
