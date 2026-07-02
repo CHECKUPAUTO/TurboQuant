@@ -6,6 +6,15 @@
 use half::f16;
 use serde::{Deserialize, Serialize};
 
+/// Default magnitude of the 1-bit residual correction, in *normalized*
+/// units (the dequantizer applies `val += ±learned_scale * scale`).
+///
+/// With the symmetric 8-level grid (step = 1.0 in level units), the
+/// quantization residual is ~uniform in [-0.5, 0.5] level units, so the
+/// MSE-optimal fixed 1-bit correction is E[|residual|] = a quarter step
+/// = 0.25 level units = 0.25 / 3.5 ≈ 0.0714 normalized.
+pub const DEFAULT_CORRECTION_SCALE: f32 = 0.25 / 3.5;
+
 /// Configuration for the QJL quantizer.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct QjlConfig {
@@ -26,7 +35,7 @@ impl Default for QjlConfig {
             block_size: 64,
             scale_mode: ScaleMode::PerBlockAbsMax,
             correction: CorrectionMode::OneBitResidual {
-                learned_scale: 0.01,
+                learned_scale: DEFAULT_CORRECTION_SCALE,
             },
         }
     }
@@ -112,6 +121,12 @@ impl QjlQuantizer {
 
     /// Quantize a block of f32 values to 3-bit with optional correction.
     ///
+    /// Uses a symmetric 8-level grid in "level units":
+    /// `{-3.5, -2.5, -1.5, -0.5, +0.5, +1.5, +2.5, +3.5}` (spacing 1.0).
+    /// A normalized value `x_norm ∈ [-1, 1]` maps to
+    /// `idx = clamp(round(x_norm * 3.5 + 3.5), 0, 7)` and reconstructs as
+    /// `(idx - 3.5) / 3.5 * scale`.
+    ///
     /// # Examples
     ///
     /// ```
@@ -121,7 +136,7 @@ impl QjlQuantizer {
     ///     bits: 3,
     ///     block_size: 64,
     ///     scale_mode: ScaleMode::PerBlockAbsMax,
-    ///     correction: CorrectionMode::OneBitResidual { learned_scale: 0.01 },
+    ///     correction: CorrectionMode::OneBitResidual { learned_scale: 0.25 / 3.5 },
     /// };
     /// let quantizer = QjlQuantizer::new(config);
     /// let data: Vec<f32> = (0..64).map(|i| (i as f32 - 32.0) / 10.0).collect();
@@ -133,9 +148,7 @@ impl QjlQuantizer {
     #[must_use]
     pub fn quantize_block(&self, block: &[f32]) -> CompressedBlock {
         let scale = self.compute_scale(block);
-        let half_range = 3.5_f32; // (8-1)/2 for 3-bit
-        let levels = 8_u8;
-        let increment = 0.5_f32; // 1.0 / (levels / 2)
+        let half_range = 3.5_f32; // (levels - 1) / 2 for 3-bit
 
         // Normalize and quantize to 3-bit levels
         let mut quantized: Vec<u8> = Vec::with_capacity(block.len());
@@ -145,24 +158,28 @@ impl QjlQuantizer {
             CorrectionMode::None => {
                 for &x in block {
                     let x_norm = (x / scale).clamp(-1.0, 1.0);
-                    let q_val = (x_norm * half_range / increment).round() * increment;
-                    let q_clamped = q_val.clamp(-half_range, half_range);
-                    // Map to 0..8 range
-                    let idx = ((q_clamped / increment) + half_range / increment).round() as u8;
-                    quantized.push(idx.clamp(0, levels - 1));
+                    let idx = x_norm
+                        .mul_add(half_range, half_range)
+                        .round()
+                        .clamp(0.0, 7.0);
+                    quantized.push(idx as u8);
                 }
             }
             CorrectionMode::OneBitResidual { learned_scale: _ } => {
                 let mut signs = vec![0u8; block.len().div_ceil(8)];
                 for (i, &x) in block.iter().enumerate() {
                     let x_norm = (x / scale).clamp(-1.0, 1.0);
-                    let q_val = (x_norm * half_range / increment).round() * increment;
-                    let q_clamped = q_val.clamp(-half_range, half_range);
-                    let idx = ((q_clamped / increment) + half_range / increment).round() as u8;
-                    quantized.push(idx.clamp(0, levels - 1));
+                    let idx = x_norm
+                        .mul_add(half_range, half_range)
+                        .round()
+                        .clamp(0.0, 7.0);
+                    quantized.push(idx as u8);
 
-                    // 1-bit residual correction sign
-                    let residual = x_norm - q_clamped;
+                    // 1-bit residual correction sign, computed consistently
+                    // in level units: `x_norm * 3.5` and `level = idx - 3.5`
+                    // both live on the [-3.5, +3.5] grid scale.
+                    let level = idx - half_range;
+                    let residual = x_norm * half_range - level;
                     if residual > 0.0 {
                         signs[i / 8] |= 1 << (i % 8);
                     }
@@ -203,7 +220,6 @@ impl QjlQuantizer {
         use crate::bitpack::unpack_3bit_slice;
         let scale = block.scale.to_f32();
         let half_range = 3.5_f32;
-        let increment = 0.5_f32;
 
         let padded_len = num_values.next_multiple_of(8);
         let quantized = match unpack_3bit_slice(&block.packed, padded_len) {
@@ -219,8 +235,9 @@ impl QjlQuantizer {
             .take(num_values)
             .enumerate()
             .map(|(i, &q)| {
-                let q_float = (f32::from(q) - half_range / increment) * increment;
-                let mut val = q_float / half_range * scale;
+                // Level in level units: idx ∈ [0, 7] → {-3.5, ..., +3.5}.
+                let level = f32::from(q) - half_range;
+                let mut val = level / half_range * scale;
 
                 // Apply 1-bit correction if available
                 if let Some(ref signs) = block.correction_bits {
@@ -245,6 +262,37 @@ impl QjlQuantizer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::Rng;
+    use rand_distr::StandardNormal;
+
+    /// Deterministic Gaussian test data.
+    fn gaussian(n: usize, seed: u64) -> Vec<f32> {
+        let mut rng: rand::rngs::StdRng = rand::SeedableRng::seed_from_u64(seed);
+        (0..n).map(|_| rng.sample(StandardNormal)).collect()
+    }
+
+    /// Round-trip a full vector block-by-block through the quantizer.
+    fn roundtrip(quantizer: &QjlQuantizer, data: &[f32]) -> Vec<f32> {
+        let block_size = quantizer.config().block_size;
+        let mut out = Vec::with_capacity(data.len());
+        for chunk in data.chunks(block_size) {
+            let compressed = quantizer.quantize_block(chunk);
+            out.extend(quantizer.dequantize_block(&compressed, chunk.len()));
+        }
+        out
+    }
+
+    fn snr_db(original: &[f32], reconstructed: &[f32]) -> f64 {
+        let mse: f64 = original
+            .iter()
+            .zip(reconstructed)
+            .map(|(a, b)| f64::from(a - b).powi(2))
+            .sum::<f64>()
+            / original.len() as f64;
+        let signal: f64 =
+            original.iter().map(|x| f64::from(*x).powi(2)).sum::<f64>() / original.len() as f64;
+        10.0 * (signal / mse.max(1e-12)).log10()
+    }
 
     #[test]
     fn test_default_config() {
@@ -307,28 +355,94 @@ mod tests {
 
     #[test]
     fn test_quantize_dequantize_with_correction() {
-        let config = QjlConfig {
-            correction: CorrectionMode::OneBitResidual {
-                learned_scale: 0.01,
-            },
+        // Representative (Gaussian) data with the default 1-bit correction.
+        // The README claims SNR > 12 dB; the fixed grid delivers ~18 dB.
+        let quantizer = QjlQuantizer::new(QjlConfig::default());
+        let data = gaussian(4096, 42);
+        let decompressed = roundtrip(&quantizer, &data);
+
+        let snr = snr_db(&data, &decompressed);
+        assert!(snr > 12.0, "SNR too low: {snr} dB");
+    }
+
+    #[test]
+    fn test_correction_improves_snr() {
+        // Regression for the old default learned_scale = 0.01, which was
+        // so small (and applied with the wrong sign convention) that the
+        // "correction" made reconstruction WORSE than no correction.
+        let data = gaussian(4096, 7);
+
+        let no_corr = QjlQuantizer::new(QjlConfig {
+            correction: CorrectionMode::None,
             ..Default::default()
+        });
+        let with_corr = QjlQuantizer::new(QjlConfig::default());
+
+        let snr_none = snr_db(&data, &roundtrip(&no_corr, &data));
+        let snr_corr = snr_db(&data, &roundtrip(&with_corr, &data));
+        assert!(
+            snr_corr > snr_none,
+            "1-bit correction must improve SNR: {snr_corr} dB vs {snr_none} dB"
+        );
+    }
+
+    #[test]
+    fn test_positive_values_roundtrip_positive() {
+        // Regression for the 3-bit grid collapse: with the broken 15-level
+        // mapping, EVERY positive input reconstructed to 0.0 (or to
+        // -learned_scale with correction enabled).
+        for correction in [
+            CorrectionMode::None,
+            CorrectionMode::OneBitResidual {
+                learned_scale: 0.25 / 3.5,
+            },
+        ] {
+            let quantizer = QjlQuantizer::new(QjlConfig {
+                correction,
+                ..Default::default()
+            });
+            let data = vec![0.25f32, 0.5, 0.75, 1.0];
+            let compressed = quantizer.quantize_block(&data);
+            let decompressed = quantizer.dequantize_block(&compressed, data.len());
+            for (x, y) in data.iter().zip(&decompressed) {
+                assert!(*y > 0.0, "positive input {x} reconstructed to {y}");
+            }
+            // Symmetric check for negatives.
+            let neg: Vec<f32> = data.iter().map(|x| -x).collect();
+            let compressed = quantizer.quantize_block(&neg);
+            let decompressed = quantizer.dequantize_block(&compressed, neg.len());
+            for (x, y) in neg.iter().zip(&decompressed) {
+                assert!(*y < 0.0, "negative input {x} reconstructed to {y}");
+            }
+        }
+    }
+
+    #[test]
+    fn test_dot_product_preserved() {
+        // QJL's raison d'être: quantization approximately preserves
+        // dot products between vectors.
+        let quantizer = QjlQuantizer::new(QjlConfig::default());
+        let a = gaussian(512, 1);
+        let b = gaussian(512, 2);
+        let a_q = roundtrip(&quantizer, &a);
+        let b_q = roundtrip(&quantizer, &b);
+
+        let dot = |x: &[f32], y: &[f32]| -> f64 {
+            x.iter()
+                .zip(y)
+                .map(|(u, v)| f64::from(*u) * f64::from(*v))
+                .sum()
         };
-        let quantizer = QjlQuantizer::new(config);
-        let data: Vec<f32> = (0..128).map(|i| (i as f32 - 64.0) / 20.0).collect();
-        let compressed = quantizer.quantize_block(&data);
-        let decompressed = quantizer.dequantize_block(&compressed, 128);
+        let norm = |x: &[f32]| dot(x, x).sqrt();
 
-        // With correction, reconstruction should be reasonable
-        let mse: f32 = data
-            .iter()
-            .zip(decompressed.iter())
-            .map(|(a, b)| (a - b).powi(2))
-            .sum::<f32>()
-            / data.len() as f32;
-
-        let signal_power: f32 = data.iter().map(|x| x.powi(2)).sum::<f32>() / data.len() as f32;
-        let snr = 10.0 * (signal_power / mse.max(1e-10)).log10();
-        assert!(snr > 2.0, "SNR too low: {snr} dB");
+        let exact = dot(&a, &b);
+        let approx = dot(&a_q, &b_q);
+        let bound = norm(&a) * norm(&b);
+        let rel_err = (exact - approx).abs() / bound;
+        assert!(
+            rel_err < 0.05,
+            "dot product not preserved: exact={exact}, approx={approx}, rel_err={rel_err}"
+        );
     }
 
     #[test]

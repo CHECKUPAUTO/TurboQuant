@@ -8,8 +8,8 @@
 
 //! CPU backend for `TurboQuant`.
 //!
-//! Provides a CPU implementation using rayon for parallelism
-//! and the `wide` crate for SIMD acceleration.
+//! Provides a CPU implementation using rayon for parallelism.
+//! (No explicit SIMD path yet; scalar code is autovectorized by LLVM.)
 
 use ndarray::{Array2, ArrayView2};
 use rayon::prelude::*;

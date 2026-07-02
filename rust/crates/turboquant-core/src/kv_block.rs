@@ -15,6 +15,10 @@ pub struct KvBlock {
     pub data: Vec<u8>,
     /// Per-block scales (f16).
     pub scales: Vec<f16>,
+    /// Optional packed 1-bit residual-correction signs (1 bit per stored
+    /// value, position-major). `None` when correction is disabled.
+    #[serde(default)]
+    pub correction: Option<Vec<u8>>,
     /// Block size (number of values per scale).
     pub block_size: usize,
     /// Head dimension.
@@ -39,16 +43,31 @@ impl KvBlock {
     #[allow(clippy::cast_possible_truncation)]
     pub fn new(head_dim: usize, seq_len: usize, block_size: usize) -> Self {
         let num_values = head_dim * seq_len;
-        let num_blocks = num_values.div_ceil(block_size);
+        // Blocks never straddle position boundaries: each position holds
+        // `head_dim.div_ceil(block_size)` scales.
+        let num_blocks = seq_len * head_dim.div_ceil(block_size);
         let packed_bytes = num_values * 3 / 8;
 
         Self {
             data: vec![0u8; packed_bytes],
             scales: vec![f16::ZERO; num_blocks],
+            correction: None,
             block_size,
             head_dim,
             seq_len,
         }
+    }
+
+    /// Number of per-block scales stored for each position.
+    #[must_use]
+    pub const fn scales_per_position(&self) -> usize {
+        self.head_dim.div_ceil(self.block_size)
+    }
+
+    /// Bytes of packed 1-bit correction signs stored for each position.
+    #[must_use]
+    pub const fn correction_bytes_per_position(&self) -> usize {
+        self.head_dim.div_ceil(8)
     }
 
     /// Store packed data at a specific positional range.
@@ -78,14 +97,74 @@ impl KvBlock {
                 "Packed data overflow".into(),
             ));
         }
+        if packed_data.len() < byte_len {
+            return Err(crate::error::TurboQuantError::CompressionError(format!(
+                "Packed data too short: got {} bytes, need {byte_len}",
+                packed_data.len()
+            )));
+        }
 
         self.data[byte_offset..byte_offset + byte_len].copy_from_slice(&packed_data[..byte_len]);
 
-        let scale_start = range.start * self.head_dim / self.block_size;
-        let scale_end = range.end * self.head_dim / self.block_size;
+        let scale_start = range.start * self.scales_per_position();
+        let scale_end = range.end * self.scales_per_position();
+        if scales.len() != scale_end - scale_start {
+            return Err(crate::error::TurboQuantError::CompressionError(format!(
+                "Scale count mismatch: got {}, need {}",
+                scales.len(),
+                scale_end - scale_start
+            )));
+        }
         self.scales[scale_start..scale_end].copy_from_slice(scales);
 
         Ok(())
+    }
+
+    /// Store packed 1-bit residual-correction signs for a positional range.
+    ///
+    /// Allocates the correction storage lazily on first use.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the range is out of bounds or `bits` is too
+    /// short for the range.
+    pub fn store_correction(&mut self, range: Range<usize>, bits: &[u8]) -> crate::Result<()> {
+        if range.end > self.seq_len {
+            return Err(crate::error::TurboQuantError::CompressionError(format!(
+                "Correction range {:?} exceeds seq_len {}",
+                range, self.seq_len
+            )));
+        }
+        let bytes_per_pos = self.correction_bytes_per_position();
+        let offset = range.start * bytes_per_pos;
+        let len = (range.end - range.start) * bytes_per_pos;
+        if bits.len() < len {
+            return Err(crate::error::TurboQuantError::CompressionError(format!(
+                "Correction bits too short: got {} bytes, need {len}",
+                bits.len()
+            )));
+        }
+        let total = self.seq_len * bytes_per_pos;
+        let store = self.correction.get_or_insert_with(|| vec![0u8; total]);
+        store[offset..offset + len].copy_from_slice(&bits[..len]);
+        Ok(())
+    }
+
+    /// Retrieve packed 1-bit correction signs for specific positions.
+    ///
+    /// Returns `None` if no correction bits are stored.
+    #[must_use]
+    pub fn retrieve_correction(&self, positions: &[usize]) -> Option<Vec<u8>> {
+        let store = self.correction.as_ref()?;
+        let bytes_per_pos = self.correction_bytes_per_position();
+        let mut result = Vec::with_capacity(positions.len() * bytes_per_pos);
+        for &pos in positions {
+            if pos >= self.seq_len {
+                continue;
+            }
+            result.extend_from_slice(&store[pos * bytes_per_pos..(pos + 1) * bytes_per_pos]);
+        }
+        Some(result)
     }
 
     /// Retrieve packed data for specific positions.
@@ -115,8 +194,8 @@ impl KvBlock {
             if pos >= self.seq_len {
                 continue;
             }
-            let scale_start = pos * self.head_dim / self.block_size;
-            let num_scales = self.head_dim.div_ceil(self.block_size);
+            let num_scales = self.scales_per_position();
+            let scale_start = pos * num_scales;
             result.extend_from_slice(&self.scales[scale_start..scale_start + num_scales]);
         }
 
@@ -126,18 +205,20 @@ impl KvBlock {
     /// Compute the memory usage in bytes.
     #[must_use]
     pub fn memory_usage_bytes(&self) -> usize {
-        self.data.len() + self.scales.len() * 2
+        self.data.len() + self.scales.len() * 2 + self.correction.as_ref().map_or(0, Vec::len)
     }
 
     /// Compute compression ratio vs FP16.
     ///
-    /// Includes overhead from per-block scales.
+    /// Includes overhead from per-block scales and, when stored, the
+    /// 1-bit residual-correction signs.
     #[must_use]
     pub fn compression_ratio_vs_fp16(&self) -> f64 {
         let fp16_bits = (self.head_dim * self.seq_len * 16) as f64;
         let payload_bits = (self.data.len() * 8) as f64;
         let scale_bits = (self.scales.len() * 16) as f64;
-        fp16_bits / (payload_bits + scale_bits)
+        let correction_bits = (self.correction.as_ref().map_or(0, Vec::len) * 8) as f64;
+        fp16_bits / (payload_bits + scale_bits + correction_bits)
     }
 }
 

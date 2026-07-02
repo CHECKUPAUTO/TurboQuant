@@ -5,17 +5,11 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "CPU backend for TurboQuant using rayon parallelism and SIMD (wide crate)"
+description = "CPU backend for TurboQuant using rayon parallelism"
 
 [dependencies]
 turboquant-core = { path = "../turboquant-core" }
 rayon.workspace = true
-wide.workspace = true
-bytemuck.workspace = true
-tracing.workspace = true
 ndarray.workspace = true
 rand.workspace = true
-
-[dev-dependencies]
-proptest.workspace = true
 
