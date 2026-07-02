@@ -102,11 +102,14 @@ class QJLQuantizer(nn.Module):
         self.bits = bits
         self.levels = 2 ** bits  # 8 levels for 3 bits
 
-        # QJL correction scale
+        # QJL correction scale, in level units (the grid steps by
+        # `increment` = 0.5, so the rounding residual is uniform in
+        # [-0.25, 0.25] and the MSE-optimal fixed correction is its mean
+        # magnitude: increment / 4 = 0.125).
         if learn_scale:
-            self.scale = nn.Parameter(torch.tensor(0.01))
+            self.scale = nn.Parameter(torch.tensor(0.125))
         else:
-            self.register_buffer('scale', torch.tensor(0.01))
+            self.register_buffer('scale', torch.tensor(0.125))
 
     def quantize(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -134,9 +137,13 @@ class QJLQuantizer(nn.Module):
         # Clip to valid range
         x_quant = torch.clamp(x_quant, -half_range, half_range)
 
-        # QJL 1-bit correction on residual
+        # QJL 1-bit correction on residual. x_quant and the residual are
+        # both in level units ([-half_range, half_range]) and dequantize()
+        # rescales by original_scale, so the correction must stay in level
+        # units too (multiplying by x_max here would inflate it by the
+        # input's dynamic range).
         residual = x_scaled - x_quant
-        correction = torch.sign(residual) * self.scale * x_max
+        correction = torch.sign(residual) * self.scale
 
         return x_quant + correction
 
