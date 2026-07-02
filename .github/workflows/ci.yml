@@ -79,6 +79,11 @@ jobs:
   audit:
     name: Security Audit
     runs-on: ubuntu-24.04
+    # rustsec/audit-check creates a check run with the results; without
+    # checks:write the job fails on push even when the audit itself is clean.
+    permissions:
+      contents: read
+      checks: write
     steps:
       - uses: actions/checkout@v4
       - uses: rustsec/audit-check@v2
