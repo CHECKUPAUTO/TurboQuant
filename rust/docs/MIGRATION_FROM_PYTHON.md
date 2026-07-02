@@ -21,11 +21,21 @@
 4. **Decompressed attention** — forward actually uses compressed cache
 5. **Scale overhead** — included in ratio calculation
 6. **Multiple rotation strategies** — QR, Householder, Hadamard
+7. **True 8-level grid and correction default** — the Rust quantizer uses
+   the symmetric 3-bit grid `{-3.5, …, +3.5}` (spacing 1.0) with
+   `DEFAULT_CORRECTION_SCALE = 0.25 / 3.5 ≈ 0.0714` relative to the block
+   scale (quarter of the grid step). The Python prototype simulates
+   quantization in floating point on a finer grid and uses a correction of
+   `0.125` in its own level units — the constants are not interchangeable.
 
 ## Porting Checklist
 
 - Replace `nn.Parameter(torch.zeros(..., dtype=torch.uint8))` with `KvBlock::new()`
 - Replace `x.abs().max()` scaling with per-block `compute_scale()`
 - Use `pack_3bit_slice` / `unpack_3bit_slice` for actual packing
-- Run `turboquant calibrate` instead of `learn_scale=True`
-- Set `--cache-type-k turbo3` in llama.cpp server arguments
+- Instead of `learn_scale=True`, configure `CorrectionMode::OneBitResidual`
+  (default `learned_scale` is the MSE-optimal quarter step; `turboquant
+  calibrate` writes a starting-point YAML with these defaults — it does not
+  yet learn from the data)
+- Check quality with `turboquant verify <compressed> --original <source>`
+  (upstream llama.cpp does not read turbo3 files yet; see GGUF.md)

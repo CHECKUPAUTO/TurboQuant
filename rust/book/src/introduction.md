@@ -4,9 +4,12 @@ TurboQuant is a 3-bit KV cache compression algorithm for Large Language Models.
 
 ## What it does
 
-- Compresses Key and Value caches from 16 bits per value (FP16) to ~3.25 bits
-- Achieves ~5× memory reduction while keeping attention quality intact
-- Enables 2-4× longer context windows on the same hardware
+- Compresses Key and Value caches from 16 bits per value (FP16) to
+  3.25 bits (no correction) or 4.25 bits (default 1-bit correction),
+  including per-block scale overhead
+- Achieves ~3.8–4.9× memory reduction at ~13–19 dB round-trip SNR
+  (measured on Gaussian data)
+- Enables proportionally longer context windows on the same hardware
 
 ## How it works
 

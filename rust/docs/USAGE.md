@@ -2,16 +2,23 @@
 
 ## CLI Recipes
 
-### Compress a model for llama.cpp
+### Compress a GGUF model
 
 ```bash
-turboquant compress llama-3-8b-Q4_K_M.gguf -o llama-3-8b-turbo3.gguf
+turboquant compress llama-3-8b.gguf -o llama-3-8b-turbo3.gguf
+
+# In place, custom block size / scale mode:
+turboquant compress model.gguf --in-place --block-size 128 --scale-mode percentile
 ```
 
 ### Verify compression integrity
 
 ```bash
+# Structure check: decompress every compressed tensor
 turboquant verify llama-3-8b-turbo3.gguf
+
+# Quality check: real per-tensor MSE/SNR against the uncompressed source
+turboquant verify llama-3-8b-turbo3.gguf --original llama-3-8b.gguf
 ```
 
 ### Benchmark on your hardware
@@ -33,27 +40,24 @@ systemctl enable --now turboquant
 turboquant daemon
 ```
 
-## llama.cpp Integration
+## llama.cpp / Ollama Integration
+
+**Status: not supported by upstream llama.cpp or Ollama yet.** A turbo3
+file is a valid GGUF container (see [GGUF.md](GGUF.md)), but stock
+llama.cpp/Ollama will not reconstruct the compressed tensors — an engine
+must implement the turbo3 spec (or link `turboquant-ffi`) to use them.
+The invocation would look like:
 
 ```bash
+# Hypothetical, requires a llama.cpp build that implements the turbo3 spec:
 ./llama-server -m model-turbo3.gguf \
-    --port 11434 \
     --ctx-size 16384 \
     --cache-type-k turbo3 \
     --cache-type-v turbo3
 ```
 
-## Ollama Modelfile
-
-```dockerfile
-FROM llama3
-PARAMETER kv_cache_type turbo3
-PARAMETER num_ctx 16384
-```
-
-```bash
-ollama create MyModel-Turbo -f Modelfile
-```
+Until then, use `turboquant verify --original` to evaluate compression
+quality offline.
 
 ## Rust Library
 
@@ -68,21 +72,33 @@ let quantizer = QjlQuantizer::new(config);
 
 ## Python Bindings
 
-```python
-import turboquant_py
+Build with maturin (`maturin develop -m rust/crates/turboquant-py/Cargo.toml`);
+the module name is `turboquant`:
 
-cache = turboquant_py.TurboQuantKVCache(
-    num_layers=24, max_seq_len=4096, head_dim=128, num_heads=32
-)
-print(cache.compression_ratio_vs_fp16())
+```python
+import numpy as np
+import turboquant
+
+data = (np.arange(64, dtype=np.float32) - 32.0) / 10.0
+
+q = turboquant.Quantizer()  # 3-bit, absmax, 1-bit correction on
+packed, scale, corr = q.quantize(data)
+restored = q.dequantize(packed, len(data), scale, corr)
 ```
+
+See [FFI.md](FFI.md) for the full Python API.
 
 ## C/FFI
 
 ```c
 #include "turboquant.h"
 
-tq_kv_block_t* block = tq_compress(data, len, bits, block_size);
-tq_decompress(block, out);
-tq_free_block(block);
+tq_quantizer *q = NULL;
+tq_quantizer_create(3, 64, TQ_SCALE_ABSMAX, 0.0f, 1, 0.0714f, &q);
+tq_quantize(q, input, n, packed, tq_packed_size(n), &packed_len,
+            &scale, corr, tq_corr_size(n), &corr_len);
+tq_dequantize(q, packed, packed_len, n, scale, corr, corr_len, output, n);
+tq_quantizer_destroy(q);
 ```
+
+See [FFI.md](FFI.md) for the full C API and a complete example.

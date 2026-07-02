@@ -46,6 +46,14 @@ k_t = Ŵ_k · y_t
 
 ## PyTorch Implementation
 
+> **Erratum**: an earlier version of this document quantized onto a
+> mis-sized grid (`round(x_scaled * 2) / 2`, i.e. 15 half-step levels for
+> a 3-bit code) with a `0.01` correction scale — the exact pattern that
+> caused the grid-collapse bug fixed in the Rust core (see
+> `BUGS_FIXED.md`, Bug R1/R3). The snippet below uses the corrected
+> symmetric 8-level grid and the MSE-optimal correction (a quarter of the
+> grid step).
+
 ```python
 import torch
 import torch.nn as nn
@@ -82,8 +90,12 @@ class MLATurboQuantSynergy(nn.Module):
         # Pre-compute absorbed matrices
         self._absorb_rotations()
 
-        # QJL correction scale (learnable)
-        self.qjl_scale = nn.Parameter(torch.ones(1) * 0.01)
+        # QJL 1-bit correction scale (learnable), in level units.
+        # The 8-level grid below has step 1.0, so the rounding residual is
+        # ~uniform in [-0.5, 0.5] and the MSE-optimal fixed correction is a
+        # quarter step: 0.25 level units (= 0.25/3.5 of the normalized
+        # range, the Rust core's DEFAULT_CORRECTION_SCALE).
+        self.qjl_scale = nn.Parameter(torch.ones(1) * 0.25)
 
     def _absorb_rotations(self):
         """
@@ -103,16 +115,19 @@ class MLATurboQuantSynergy(nn.Module):
         """
         3-bit quantization with QJL correction.
 
-        TurboQuant uses 3 bits per value (8 levels).
-        Range: [-3.5, 3.5] in 0.5 increments
+        TurboQuant uses 3 bits per value: the symmetric 8-level grid
+        {-3.5, -2.5, -1.5, -0.5, +0.5, +1.5, +2.5, +3.5} (spacing 1.0).
+        The 3-bit code is idx = clamp(round(x_scaled + 3.5), 0, 7);
+        the level is idx - 3.5.
         """
         # Scale to [-3.5, 3.5]
         x_scaled = x / (x.abs().max() + 1e-8) * 3.5
 
-        # Quantize to 3 bits (8 levels)
-        x_quant = torch.round(x_scaled * 2) / 2  # 0.5 increments
+        # Quantize to 3 bits (8 levels, codes 0..7)
+        codes = torch.clamp(torch.round(x_scaled + 3.5), 0, 7)
+        x_quant = codes - 3.5  # levels in {-3.5, ..., +3.5}
 
-        # QJL 1-bit correction
+        # QJL 1-bit correction (level units, same as x_quant)
         residual = x_scaled - x_quant
         correction = torch.sign(residual) * self.qjl_scale
 
