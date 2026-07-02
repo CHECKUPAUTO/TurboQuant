@@ -2,9 +2,9 @@
 Tests unitaires pour TurboQuant.
 
 Usage:
-    python -m pytest turboquant_test.py -v
+    python -m pytest tests/test_core.py -v
     # ou
-    python turboquant_test.py
+    python tests/test_core.py
 """
 
 import math
@@ -12,10 +12,7 @@ import unittest
 
 import torch
 
-# Import the fixed turboquant module
-import sys
-sys.path.insert(0, '/root')
-from turboquant_fixed import (
+from turboquant import (
     PolarQuant,
     QJLQuantizer,
     TurboQuantKVCache,

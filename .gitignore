@@ -40,3 +40,4 @@ Thumbs.db
 # Rust
 target/
 Cargo.lock.orig
+book-output/

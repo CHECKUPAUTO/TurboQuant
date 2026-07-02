@@ -27,6 +27,17 @@ bench = [
 Homepage = "https://github.com/CHECKUPAUTO/TurboQuant"
 Repository = "https://github.com/CHECKUPAUTO/TurboQuant"
 
+# The distribution is the single top-level module turboquant.py; without
+# this, setuptools' flat-layout auto-discovery aborts on the rust/,
+# legacy/ and deploy/ directories.
+[tool.setuptools]
+py-modules = ["turboquant"]
+
+# Collect only tests/ — legacy/python/ keeps a deprecated copy of the
+# prototype whose tests must not run.
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.ruff]
 line-length = 100
 

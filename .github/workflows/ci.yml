@@ -84,6 +84,8 @@ jobs:
       - uses: rustsec/audit-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          # The Cargo workspace (and its Cargo.lock) lives under rust/.
+          working-directory: rust
 
   book:
     name: mdBook
