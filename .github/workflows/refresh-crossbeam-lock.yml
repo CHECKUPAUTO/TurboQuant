@@ -1,0 +1,33 @@
+name: Refresh vulnerable crossbeam lock
+
+on:
+  push:
+    branches:
+      - agent/bootstrap-contract
+
+permissions:
+  contents: write
+
+jobs:
+  refresh-lock:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/bootstrap-contract
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Refresh patched crossbeam-epoch resolution
+        run: cargo update --manifest-path rust/Cargo.toml -p crossbeam-epoch --precise 0.9.20
+      - name: Commit refreshed lockfile
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add rust/Cargo.lock
+          if git diff --cached --quiet; then
+            echo 'Lockfile already patched.'
+            exit 0
+          fi
+          git commit -m 'fix(deps): update crossbeam-epoch past RUSTSEC-2026-0204'
+          git push origin HEAD:agent/bootstrap-contract
