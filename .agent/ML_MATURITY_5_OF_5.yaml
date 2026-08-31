@@ -1,0 +1,56 @@
+schema_version: 1
+kind: memorithm_ml_maturity_program
+status: active
+last_updated: "2026-08-31"
+repository: Memorithm/TurboQuant
+objective: >-
+  Raise TurboQuant codec maturity to evidence-backed 5/5 as a reusable low-bit
+  KV/representation component, with real-model quality evidence and no ownership
+  expansion into model runtimes or adaptive policy engines.
+score_policy:
+  five_of_five_requires:
+    - versioned_binary_or_memory_representation_contract
+    - exact_storage_accounting_including_metadata_and_padding
+    - golden_vectors_and_cross_backend_parity
+    - real_model_quality_memory_and_performance_evidence
+    - exact_head_required_CI_green
+  forbidden:
+    - treating_gaussian_round_trip_SNR_as_LLM_quality
+    - quoting_nominal_bits_without_all_overheads
+    - allowing_SLHAv2_and_TurboQuant_TQ3_semantics_to_drift
+priority_program:
+  - id: TQML0
+    name: Canonical codec contract
+    priority: P0
+    goals:
+      - freeze_versioned_encode_decode_and_score_semantics
+      - specify_bitpacking_scale_correction_alignment_and_endianness
+      - publish_golden_vectors_shared_with_SLHAv2
+      - expose_exact_physical_storage_accounting_compatible_with_SciRust_representation_IR
+  - id: TQML1
+    name: Backend parity
+    priority: P0
+    goals:
+      - preserve_scalar_CPU_oracle
+      - validate_SIMD_and_CUDA_paths_against_golden_vectors
+      - define_dtype_conversion_and_accumulation_error_budgets
+  - id: TQML2
+    name: Real model qualification
+    priority: P0
+    goals:
+      - integrate_through_SLHAv2_or_NNIS_KV_contract_without_forking_model_runtime
+      - measure_real_prefill_decode_quality_memory_and_throughput
+      - include_long_context_sweeps_and_multiple_model_shapes
+    exit_criteria:
+      - codec_evidence_includes_model_level_quality_not_only_synthetic_SNR
+  - id: TQML3
+    name: Representation ecosystem adapter
+    priority: P1
+    goals:
+      - publish_backend_neutral_descriptor_for_SciRust_representation_IR
+      - expose_cost_and_capability_metadata_to_ElasticXxx_without_embedding_policy
+      - preserve_codec_identity_in_evidence_and_artifacts
+completion_definition: >-
+  TurboQuant is 5/5 only when its format is exact and versioned, every optimized
+  backend matches an independent oracle, storage costs are physically accounted,
+  and representative real LLM runs establish quality/memory/performance behavior.
