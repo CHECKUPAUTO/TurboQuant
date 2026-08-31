@@ -1,0 +1,196 @@
+schema_version: 1
+kind: turboquant_ecosystem_agent_roadmap
+status: active
+last_updated: "2026-08-31"
+repository: Memorithm/TurboQuant
+intended_consumer: autonomous_coding_agent
+merge_policy: never_merge_this_file_to_default_branch_unless_user_explicitly_requests
+
+mission:
+  primary: >-
+    Evolve TurboQuant as the maintained Rust implementation of a specialized
+    low-bit compression/representation codec, with explicit format semantics,
+    reference correctness, backend parity, safe model conversion, and measured
+    end-to-end quality and memory effects before any broad runtime claim.
+  ecosystem_goal: >-
+    Supply versioned representation candidates and codec evidence to SLHAv2,
+    ElasticXxx, SciRust and specialized runtimes without duplicating KV-cache
+    policy, generic adaptive-resource control, or whole-model runtime ownership.
+
+verified_current_facts:
+  - the_maintained_implementation_is_under_rust_and_the_Python_prototype_is_preserved_as_legacy_reference
+  - current_architecture_contains_core_CPU_CUDA_GGUF_CLI_daemon_FFI_Python_and_benchmark_crates
+  - README_reports_measured_round_trip_SNR_on_standard_normal_data_and_storage_ratios_including_scale_and_correction_overhead
+  - those_reported_SNR_numbers_are_synthetic_round_trip_codec_measurements_not_real_LLM_quality_evidence
+  - SLHAv2_documents_a_TQ3_codec_port_based_on_TurboQuant
+  - CUDA_is_optional_and_the_CPU_path_is_a_normal_workspace_crate_not_a_feature_toggle
+
+invariants:
+  - correctness_and_declared_representation_semantics_dominate_compression_or_speed
+  - synthetic_codec_SNR_is_not_real_model_quality
+  - nominal_bits_per_value_must_include_all_required_scale_correction_index_and_alignment_overheads_for_storage_claims
+  - encoded_format_version_and_correction_mode_must_be_explicit_and_fail_closed_on_unknown_values
+  - CPU_CUDA_FFI_Python_and_model_conversion_paths_must_share_one_canonical_codec_semantics
+  - legacy_Python_is_reference_history_not_a_second_independently_evolving_product
+  - model_conversion_never_silently_changes_unsupported_tensors_or_claims_runtime_support_that_is_not_present
+  - required_CI_must_be_green_on_exact_PR_head_before_merge
+
+ownership:
+  role: specialized_low_bit_representation_codec_and_conversion_tooling
+  owns:
+    - TurboQuant_rotation_quantization_correction_and_bitpacking_semantics
+    - canonical_encoded_format_and_storage_accounting
+    - CPU_and_optional_CUDA_codec_backends
+    - GGUF_conversion_specific_to_TurboQuant_format_support
+    - codec_microbenchmarks_and_round_trip_reference_tests
+  does_not_own:
+    - SLHAv2_KV_tile_cache_residency_quality_or_real_model_policy
+    - ElasticXxx_generic_representation_selection_and_runtime_control_loop
+    - SciRust_general_tensor_or_quantization_IR_policy
+    - NNIS_general_model_runtime_or_weight_representation_policy
+    - Forge_candidate_search_semantics
+    - SciRust_Verify_dossier_or_verdict_semantics
+
+control_loop:
+  - DEFINE_CANONICAL_REPRESENTATION_AND_STORAGE_ACCOUNTING
+  - ENCODE_WITH_REFERENCE_PATH
+  - DECODE_OR_SCORE_WITH_REFERENCE_PATH
+  - VERIFY_NUMERICAL_AND_FORMAT_INVARIANTS
+  - VERIFY_BACKEND_PARITY
+  - INTEGRATE_WITH_REAL_MODEL_OR_KV_CONSUMER
+  - MEASURE_QUALITY_MEMORY_AND_THROUGHPUT_SEPARATELY
+  - PROMOTE_OR_REJECT_WITH_EVIDENCE
+
+ecosystem_interfaces:
+  Memorithm/SLHAv2:
+    relationship: primary_KV_consumer_and_existing_TQ3_port
+    status: active_convergence_target
+    contract:
+      - audit_TQ3_semantics_against_current_TurboQuant_canonical_definition
+      - maintain_versioned_test_vectors_for_shared_codec_behavior
+      - SLHAv2_owns_tile_layout_cache_policy_and_real_model_quality_gate
+      - avoid_two_silently_divergent_TQ3_definitions
+  Memorithm/ElasticXxx:
+    relationship: generic_representation_selection_runtime
+    status: planned_versioned_bridge
+    contract:
+      - TurboQuant_exports_representation_descriptor_storage_cost_capabilities_and_correctness_evidence
+      - ElasticXxx_decides_if_when_and_where_to_apply_a_qualified_representation_under_application_invariants
+      - TurboQuant_does_not_own_runtime_transition_policy
+  Memorithm/scirust:
+    relationship: shared_tensor_representation_and_general_quantization_substrate
+    status: planned_selective
+    contract:
+      - promote_only_general_primitives_or_representation_metadata_that_are_not_TurboQuant_specific
+      - retain_codec_specific_math_and_format_ownership_here
+  Memorithm/NVIDIA-Native-Inference-Stack:
+    relationship: optional_native_runtime_consumer
+    status: planned_not_assumed
+    contract:
+      - integration_requires_explicit_runtime_kernel_support_and_same_model_quality_evidence
+      - converted_model_files_alone_do_not_establish_NNIS_support
+  Memorithm/forge:
+    relationship: optional_search_engine_for_codec_parameters_or_kernels
+    status: planned_not_assumed
+    rule: every_candidate_is_gated_by_canonical_decode_or_score_correctness_before_measurement_selection
+  Memorithm/SciRust-Verify:
+    relationship: future_evidence_normalization_layer
+    status: planned
+    contract:
+      - distinguish_storage_exactness_synthetic_round_trip_quality_backend_performance_and_real_model_quality_evidence
+  Memorithm/scirust-hub:
+    relationship: future_benchmark_or_conversion_component_orchestration
+    status: planned_not_assumed
+
+roadmap:
+  - id: TQ0
+    name: Canonical Rust and legacy-lineage audit
+    status: active
+    goals:
+      - establish_rust_turboquant_core_as_single_active_semantic_source
+      - compare_legacy_Python_only_as_reference_and_migration_evidence
+      - inventory_all_format_constants_correction_modes_test_vectors_and_storage_overheads
+  - id: TQ1
+    name: Versioned representation format contract
+    status: active_priority
+    goals:
+      - define_machine_readable_codec_version_block_size_rotation_mode_correction_mode_and_storage_layout
+      - exact_total_storage_bits_and_bytes_accounting
+      - deterministic_reference_test_vectors
+      - fail_closed_unknown_versions_modes_and_malformed_payloads
+      - compatibility_and_migration_rules_before_format_changes
+  - id: TQ2
+    name: Cross-backend semantic parity
+    status: active
+    goals:
+      - CPU_reference_as_oracle
+      - CUDA_parity_where_hardware_exists
+      - FFI_and_Python_binding_round_trip_parity
+      - deterministic_or_explicitly_toleranced_behavior_by_operation
+      - no_backend_specific_format_drift
+  - id: TQ3
+    name: SLHAv2 codec convergence
+    status: active_priority
+    goals:
+      - compare_existing_SLHAv2_TQ3_port_with_canonical_test_vectors
+      - publish_shared_versioned_adapter_or_fixture_contract
+      - preserve_SLHAv2_specific_tile_metadata_outside_TurboQuant_core_format_when_not_general
+      - gate_changes_on_both_repositories_tests
+  - id: TQ4
+    name: Real model and KV quality evidence
+    status: pending_after_TQ1_TQ3
+    goals:
+      - evaluate_same_model_tokenizer_prompt_context_and_decode_policy_with_baseline_and_TurboQuant_KV_representation
+      - report_quality_memory_and_tokens_per_second_separately
+      - retain_synthetic_Gaussian_SNR_as_codec_evidence_only
+      - reject_candidates_that_fail_declared_real_model_quality_budget
+  - id: TQ5
+    name: Elastic representation candidate contract
+    status: planned_after_TQ1
+    goals:
+      - export_versioned_representation_descriptor_and_capability_requirements
+      - expose_exact_storage_cost_and_conversion_cost_observations
+      - support_plan_replay_only_when_format_hardware_and_workload_identity_match
+      - leave_invariant_validation_and_runtime_commit_rollback_to_ElasticXxx
+  - id: TQ6
+    name: Safe model conversion productization
+    status: active
+    goals:
+      - validate_GGUF_source_and_target_metadata
+      - explicit_supported_tensor_selection
+      - atomic_or_fail_closed_output_publication
+      - no_silent_overwrite_or_partial_success_claim
+      - post_conversion_structural_and_round_trip_validation
+  - id: TQ7
+    name: Evidence-backed performance specialization
+    status: planned
+    goals:
+      - benchmark_CPU_and_CUDA_paths_with_environment_fingerprint
+      - separate_codec_encode_decode_score_and_end_to_end_runtime_metrics
+      - use_Forge_only_for_correctness_gated_candidates_if_needed
+      - no_default_promotion_from_microbenchmarks_alone
+  - id: TQ8
+    name: Stable ecosystem codec product
+    status: long_term
+    goals:
+      - semver_MSRV_and_format_version_policy
+      - stable_CLI_and_library_contracts
+      - ecosystem_compatibility_matrix
+      - reproducible_real_model_quality_and_memory_regression_suite
+
+agent_operating_protocol:
+  must_read_this_file:
+    - at_start_of_every_agent_session
+    - before_format_codec_math_model_conversion_or_storage_claim_changes
+    - before_SLHAv2_ElasticXxx_SciRust_or_NNIS_integration
+    - before_performance_or_quality_promotion
+    - before_PR_or_merge_decisions
+  must_update_this_file:
+    - when_format_or_codec_version_changes
+    - when_a_backend_or_real_model_candidate_is_promoted_or_rejected
+    - when_a_cross_repository_codec_contract_changes
+    - when_a_roadmap_phase_changes_status
+  fail_closed: >-
+    If this roadmap cannot be read, do not make major format, codec-semantic,
+    model-conversion, quality-promotion, cross-repository integration, or merge
+    decisions. Read-only diagnosis is allowed.
